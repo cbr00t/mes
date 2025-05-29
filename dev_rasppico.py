@@ -51,7 +51,7 @@ class RawSocket(BaseRawSocket):
         sock = self.sock = self._pool.socket()
         ep = (ip2Str(srv.ip), srv.rawPort)
         sock.connect(ep)
-        print(f'! sock_open: [{ep[0]}:{ep[1]}]')
+        print(f'! sock_open', '{ep[0]}:{ep[1]}')
         return self
 
 # ---------- LCD Control Class ----------
@@ -63,11 +63,13 @@ class LCDCtl:
         lcd.set_backlight(True)
     def clear(self):
         self.lcd.clear()
+        print('lcdClear')
         return self
     def write(self, data, row=0, col=0):
         lcd = self.lcd
         lcd.set_cursor_pos(row, col)
         lcd.print(data)
+        print('lcdWrite', data)
         return self
 
 # ---------- Keypad Control Class ----------

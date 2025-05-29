@@ -3,45 +3,65 @@ import json
 from common import *
 from config import local
 import core
+from appHandlers import AppHandlers
 
 def init():
-    global dev, req, sock, lcd, keypad
-    dev = core.getDevice()
-    sock = dev.sock; req = dev.req
-    lcd = dev.lcd; keypad = dev.keypad
-    keypad.set_onRelease(keypad_onRelease)
+    global handlers
+    handlers = AppHandlers(core.getDevice())
 
 def run():
-    # test()
-    lcd.write('RUNNING', 0, 0)
+    handlers.lcdWrite('Sky MES', 0, 0)
+    print('app started')
     while True:
         loop()
 
+def loop():
+    recv = handlers.sockRecv; send = handlers.sockSend
+    if not handlers.sockIsConnected():
+        handlers.sockOpen()
+        handlers.lcdWrite('KOMUT BEKLENIYOR', 1, 2)
+        print('awaiting remote command')
+    resp = recv(); actions = None
+    if resp:
+        if isinstance(resp, str):
+            resp = json.loads(resp)
+        print(f'rawSocket interrupt: {json.dumps(resp)}')
+        actions = [resp] if isinstance(resp, dict) else resp
+    if actions:
+        for item in actions:
+            action = item.get('action') or item.get('cmd')
+            if not action:
+                continue     # bozuk veri
+            handler = getattr(handlers, action, None)
+            if handler is None:
+                print('[ERROR]  no matching handler', action)
+                send(json.dumps({
+                    'isError': True, 'rc': 'invalidAction',
+                    'errorText': f'{action} action gecersizdir'
+                }))
+                continue
+            args = []
+            if 'args' in item:
+                _args = item['args']
+                # Eğer args bir listeyse direkt ekle, değilse tek öğe olarak al
+                if isinstance(_args, list): args.extend(_args)
+                else: args.append(_args)
+            try:
+                handler(*args)   # ← JavaScript’teki handler.call(this, ...args) karşılığı budur
+            except Exception as ex:
+                print(f'[ERROR]  handler execution failed: {ex}')
+                send(json.dumps({
+                    'isError': True,
+                    'rc': 'handlerExecError',
+                    'errorText': f'{action} action calistirilamadi: {ex}'
+                }))
+    handlers.keypadUpdate()
+    sleep(0.1)
+
 def test():
-    global dev; sock = dev.sock
-    sock.open()
-    sock.talk(json.dumps({
+    handlers.talk(json.dumps({
         'ws':   'ws/skyMES/makineDurum',
         'api':  'fnIslemi',
         'qs': { 'id': 2, 'ip': local.ip }
     }))
-    sock.close()
-
-def loop():
-    global dev, sock
-    sleep(0.05)
-    sock = dev.sock
-    if not sock.isConnected():
-        sock.open()
-        sock.write({ 'ws': 'ws/genel', 'api': 'getSessionInfo' })
-    resp = sock.read()
-    if resp:
-        print(f'rawSocket interrupt: [{json.dumps(resp)}]')
-        sleep(0.2)
-    keypad.update()
-
-def keypad_onPress(key):
-    print(f'key_press: [{key}]')
-def keypad_onRelease(key, duration):
-    print(f'key_release: [{key}:{duration}]')
-
+    handlers.sockClose()
