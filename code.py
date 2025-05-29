@@ -1,0 +1,2 @@
+import bootldr
+bootldr.run()
