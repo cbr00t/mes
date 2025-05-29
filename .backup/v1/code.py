@@ -1,2 +1,0 @@
-import bootldr
-bootldr.run()

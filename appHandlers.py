@@ -1,18 +1,21 @@
-from time import sleep
+from time import sleep, monotonic
 import json
 from common import *
-from config import local
+from config import local, server as srv
 import core
 
 class AppHandlers:
     def __init__(self, dev = None):
         self.dev = dev
+        self._keypad_lastTime = None
         # sock = dev.sock; req = dev.req
         # lcd = dev.lcd; keypad = dev.keypad
         keypad = dev.keypad
         if keypad is not None:
             keypad.set_onPress(self.keypad_onPressed)
             keypad.set_onRelease(self.keypad_onReleased)
+    
+    ## Handler API Interface
     def reboot(self):
         import supervisor
         print('rebooting...')
@@ -30,18 +33,38 @@ class AppHandlers:
         sock = self.dev.sock
         if (not sock.isConnected()):
             sock.open()
-            sock.write(statusCheckMessage or { 'ws': 'ws/genel', 'api': 'getSessionInfo' })
+            payload = statusCheckMessage or self.getWSData('getSessionInfo')
+            if isinstance(payload, (dict, list)):
+                payload = json.dumps(payload)
+            sock.talk(payload)
         return self
     def sockSend(self, data):
-        self.sockOpen()
-        self.dev.sock.write(data)
+        if isinstance(data, (dict, list)):
+            data = json.dumps(data)
+        self.sockOpen(); sock = self.dev.sock
+        sock.write(data)
         return self
     def sockRecv(self, timeout=None):
-        sock = self.dev.sock
-        return sock.read() if timeout is None else sock.read(timeout)
-    def talk(self, data):
-        self.dev.sock.talk(data)
+        self.sockOpen(); sock = self.dev.sock
+        result = sock.read() if timeout is None else sock.read(timeout)
+        if result and not isinstance(result, (dict, list)):
+            result = json.loads(result)
+        return result
+    def sockTalk(self, data):
+        self.sockOpen(); sock = self.dev.sock
+        sock.talk(data)
         return self
+    def wsSend(self, api, args = None, data = None, wsPath = None):
+        return self.sockSend(self.getWSData(api, args, data, wsPath))
+    def wsRecv(self, timeout=None):
+        return self.sockRecv(timeout)
+    def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
+        return self.sockTalk(self.getWSData(api, args, data, wsPath))
+    def getWSData(self, api, args = None, data = None, wsPath = None):
+        return {
+            'ws': wsPath or srv.wsPath, 'api': api, 'args': args,
+            'data': { 'base64': False, 'data': data }
+        }
     def sockClose(self):
         return self.sock.close()
     def req(self, data):
@@ -55,8 +78,21 @@ class AppHandlers:
     def keypadUpdate(self):
         self.dev.keypad.update()
         return self
+    def checkStatus(self):
+        pass
+    def updateStatus(self, result):
+        if result is not None:
+            print(json.dumps(result))
+
+    ## Event Handlers
     def keypad_onPressed(self, key):
+        self._keypad_lastTime = monotonic()
         print(f'key_press: [{key}]')
     def keypad_onReleased(self, key, duration):
         print(f'key_release: [{key}:{duration}]')
-        pass
+        key = key.lower()
+        _id = 'primary' if key == '0' or key == 'enter' else key
+        delayMS = monotonic() - self._keypad_lastTime if self._keypad_lastTime else 0
+        self.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS })
+
+

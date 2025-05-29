@@ -1,4 +1,4 @@
-### 📁 devBase.py (Yrtak Modül)
+### 📁 devBase.py (Ortak Modül)
 from common import *
 import config as cfg
 import json
@@ -31,10 +31,14 @@ class BaseRawSocket:
         except Exception as ex:
             print("[SocketError]", ex)
             self.close()
-        return self._decodeLine(buffer)
+        try:
+            return self._decodeLine(buffer)
+        except Exception as ex:
+            print('[SocketDataError]', ex)
+            return None
 
     def write(self, data):
-        if not self.isConnected(): return None
+        if not self.isConnected(): return False
         buffer = self._prepareData(data)
         sock = self.sock; totalSize = 0
         try:
@@ -46,7 +50,7 @@ class BaseRawSocket:
         except Exception as ex:
             print("[SocketError]", ex)
             self.close()
-        return self
+        return True 
     
     def close(self):
         try: self.sock.close()
@@ -55,9 +59,9 @@ class BaseRawSocket:
         print(f'! sock_close')
         return self
 
-    def talk(self, data):
+    def talk(self, data, timeout=None):
         self.write(data)
-        return self.read()
+        return self.read(timeout)
 
     def _prepareData(self, data):
         if isinstance(data, dict):
@@ -70,18 +74,19 @@ class BaseRawSocket:
         raise TypeError("RawSocket.write(): data must be str, dict or bytes")
 
     def _decodeLine(self, buffer):
+        if not buffer:
+            return None
         line = buffer.split(b'\n', 1)[0]
         data = line.decode()
         if data.startswith('\ufeff'):
             data = data[1:]    # UTF-8 BOM temizle
         try:
             if data: data = data.strip()
-            result = json.loads(data)
             print(f'< sock_recv {len(data)}  Data: {data}')
         except Exception as ex:
             print(f'< sock_recv {len(data)}  Data: {data}')
             raise ex
-        return result
+        return data
 
 class BaseWebReq:
     def sendText(self, url):
@@ -103,3 +108,4 @@ class BaseKeypad:
     def set_onRelease(self, handler):
         self.onRelease = handler
         return self
+

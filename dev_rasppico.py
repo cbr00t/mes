@@ -50,8 +50,12 @@ class RawSocket(BaseRawSocket):
         srv = self.server
         sock = self.sock = self._pool.socket()
         ep = (ip2Str(srv.ip), srv.rawPort)
-        sock.connect(ep)
-        print(f'! sock_open', '{ep[0]}:{ep[1]}')
+        try:
+            sock.connect(ep)
+            print(f'! sock_open', '{ep[0]}:{ep[1]}')
+        except Exception:
+            sock = self.sock = None
+            raise
         return self
 
 # ---------- LCD Control Class ----------

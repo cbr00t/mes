@@ -1,7 +1,7 @@
 from time import sleep
 import json
 from common import *
-from config import local
+from config import local, server as srv
 import core
 from appHandlers import AppHandlers
 
@@ -16,15 +16,24 @@ def run():
         loop()
 
 def loop():
-    recv = handlers.sockRecv; send = handlers.sockSend
-    if not handlers.sockIsConnected():
-        handlers.sockOpen()
-        handlers.lcdWrite('KOMUT BEKLENIYOR', 1, 2)
-        print('awaiting remote command')
-    resp = recv(); actions = None
+    wsRecv = handlers.wsRecv; wsSend = handlers.wsSend; wsTalk = handlers.wsTalk
+    connected = handlers.sockIsConnected()
+    if not connected:
+        ip = ip2Str(srv.ip); port = srv.rawPort
+        handlers.lcdClear()
+        handlers.lcdWrite('SUNUCUYA BAGLAN:', 0, 1)
+        handlers.lcdWrite(f'{ip}:{port}', 1, 2)
+        try:
+            handlers.sockOpen(); connected = True
+            handlers.lcdClear(); handlers.lcdWrite('KOMUT BEKLENIYOR', 1, 2)
+            print('awaiting remote command')
+        except Exception as ex:
+            connected = False
+            print('[ERROR]', ex)
+    resp = actions = None
+    if connected:
+        resp = wsRecv()
     if resp:
-        if isinstance(resp, str):
-            resp = json.loads(resp)
         print(f'rawSocket interrupt: {json.dumps(resp)}')
         actions = [resp] if isinstance(resp, dict) else resp
     if actions:
@@ -35,10 +44,7 @@ def loop():
             handler = getattr(handlers, action, None)
             if handler is None:
                 print('[ERROR]  no matching handler', action)
-                send(json.dumps({
-                    'isError': True, 'rc': 'invalidAction',
-                    'errorText': f'{action} action gecersizdir'
-                }))
+                wsSend({ 'isError': True, 'rc': 'invalidAction', 'errorText': f'{action} action gecersizdir' })
                 continue
             args = []
             if 'args' in item:
@@ -47,21 +53,13 @@ def loop():
                 if isinstance(_args, list): args.extend(_args)
                 else: args.append(_args)
             try:
-                handler(*args)   # ← JavaScript’teki handler.call(this, ...args) karşılığı budur
+                handler(*args)                                                    # ← [js]  handler.call(this, ...args) karşılığı
             except Exception as ex:
                 print(f'[ERROR]  handler execution failed: {ex}')
-                send(json.dumps({
-                    'isError': True,
-                    'rc': 'handlerExecError',
-                    'errorText': f'{action} action calistirilamadi: {ex}'
-                }))
+                wsSend({ 'isError': True, 'rc': 'handlerExecError', 'errorText': f'{action} action calistirilamadi: {ex}' })
     handlers.keypadUpdate()
     sleep(0.1)
 
 def test():
-    handlers.talk(json.dumps({
-        'ws':   'ws/skyMES/makineDurum',
-        'api':  'fnIslemi',
-        'qs': { 'id': 2, 'ip': local.ip }
-    }))
+    handlers.wsTalk('fnIslemi', { 'id': 2, 'ip': local.ip })
     handlers.sockClose()

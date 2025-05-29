@@ -6,7 +6,7 @@ import requests
 from common import *
 import config as cfg
 import core
-from devBase import BaseRawSocket, BaseWebReq
+from devBase import *
 
 # ---------- Ethernet Class (Mock) ----------
 class Eth:
@@ -33,8 +33,12 @@ class RawSocket(BaseRawSocket):
         srv = self.server
         sock = self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ep = (ip2Str(srv.ip), srv.rawPort)
-        sock.connect(ep)
-        print(f'! sock_open: [{ep[0]}:{ep[1]}]')
+        try:
+            sock.connect(ep)
+            print(f'! sock_open: [{ep[0]}:{ep[1]}]')
+        except Exception:
+            sock = self.sock = None
+            raise
         return self
 
 # ---------- LCD Class (Mock) ----------
@@ -54,7 +58,7 @@ class Keypad(BaseKeypad):
         print("[Keypad] (mock) initialized.")
     def update(self):
         super().update()
-        print("[Keypad] updated.")
+        # print("[Keypad] updated.")
         return self
 
 

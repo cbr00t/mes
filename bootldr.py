@@ -11,16 +11,26 @@ def run():
 
 def updateFiles():
     global dev
-    autoUpdate = srv.autoUpdate; url = srv.updateUrl
-    if not (autoUpdate and url):
+    autoUpdate = srv.autoUpdate; urls = getUpdateUrls()
+    if not (autoUpdate and urls):
         return False
     req = dev.req
-    try:
-        resp = req.sendText(f'{url}/files.txt')
-        # Update List yok ise: oto-update iptal
-        if 'Not found' in resp: return False
-    except Exception as ex:
-        print(ex)
+    url = None; lastError = None
+    for _url in urls:
+        try:
+            resp = req.sendText(f'{_url}/files.txt')
+            # Update List yok ise: oto-update iptal
+            if 'Not found' in resp:
+                continue
+            url = _url; lastError = None
+            break
+        except Exception as ex:
+            lastError = ex
+            continue
+
+    if lastError:
+        print(lastError)
+    if lastError or not url:
         return False
     
     for name in resp.split('\n'):
@@ -58,3 +68,4 @@ def boot():
     import app
     app.init()
     app.run()
+
