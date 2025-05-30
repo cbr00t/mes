@@ -81,6 +81,7 @@ class LCDCtl:
         interface = I2CPCF8574Interface(i2c, 0x27)
         lcd = self.lcd = LCD(interface, num_rows=4, num_cols=20)
         lcd.set_backlight(True)
+        lcd.clear()
     def clear(self):
         self.lcd.clear()
         print('lcdClear')

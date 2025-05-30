@@ -17,9 +17,9 @@ class AppHandlers:
     
     ## Handler API Interface
     def reboot(self):
-        import supervisor
+        import microcontroller
         print('rebooting...')
-        supervisor.reload()
+        microcontroller.reset()
         return self
     def lcdWrite(self, text, row=0, col=0):
         self.dev.lcd.write(text, row, col)
