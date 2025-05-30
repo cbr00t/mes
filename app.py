@@ -21,7 +21,7 @@ def loop():
     wsRecv = handlers.wsRecv; wsSend = handlers.wsSend; wsTalk = handlers.wsTalk
     _lcdStatus_lastTime = handlers._lcdStatus_lastTime
     if _lcdStatus_lastTime and (monotonic() - _lcdStatus_lastTime) > 5:
-        handlers.lcdWrite(' ' * 20, 2, 1)
+        handlers.lcdWrite(' ' * 20, 2, 0)
     hearbeatInterval = getHeartbeatInterval()
     if (hearbeatInterval or 0) <= 0:
         hearbeatInterval = None

@@ -120,7 +120,7 @@ class AppHandlers:
         busy()
         self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'TUS GONDER: [{key}]...', 2, 1)
         result = self.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS })
-        self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'* [{key}] GONDERILDI', 2, 1)
+        self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'* [{key}] GITTI', 2, 0)
         return result
 
 
