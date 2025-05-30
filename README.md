@@ -1,3 +1,3 @@
-Boot       : **boot.py**
-
-EntryPoint:  **code.py**
+- Targetted Devices: Local, Raspberry Pi Pico (pycircuit)
+- Boot       : **boot.py**
+- EntryPoint:  **code.py**
