@@ -4,6 +4,7 @@ from config import mod
 
 class Device:
     def __init__(self, **kwargs):
+        self._eth = kwargs.get('_eth')
         self.eth = kwargs.get('eth')
         self.req = kwargs.get('req')
         self.sock = kwargs.get('sock')
@@ -20,3 +21,4 @@ def getDevice():
         dynImport(f'dev_{modName_device}', 'mod_dev')
         print(dev)
     return dev
+

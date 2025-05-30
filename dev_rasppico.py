@@ -2,8 +2,8 @@
 from common import *
 import core
 import config as cfg
-from time import sleep, monotonic
 from devBase import *
+from time import sleep, monotonic
 import board
 import digitalio
 import busio
@@ -18,41 +18,57 @@ from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 # ---------- Ethernet Class ----------
 class Eth:
     def __init__(self):
-        self._cs = digitalio.DigitalInOut(board.GP17)
-        self._spi = busio.SPI(board.GP18, board.GP19, board.GP16)
+        self._spi = self._cs = self.eth = None
     def init(self):
         local = cfg.local; is_dhcp = not local.ip
-        eth = self.eth = WIZNET5K(self._spi, self._cs, is_dhcp=is_dhcp)
+        spi = self._spi; cs = self._cs; eth = self.eth
+        if spi is not None:
+            spi.deinit()
+            spi = None
+        if cs is None:
+            cs = self._cs = digitalio.DigitalInOut(board.GP17)
+        if spi is None:
+            spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16)
+        eth = self.eth = WIZNET5K(spi, cs, is_dhcp=is_dhcp)
         if not is_dhcp:
             eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
         while not eth.link_status:
             print("eth init...")
-            sleep(1)
-        return eth
+            sleep(0.5)
+        return self
 
 # ---------- Web Requests Class ----------
 class WebReq(BaseWebReq):
     def __init__(self):
-        pool = self._pool = adafruit_connection_manager.get_radio_socketpool(dev.eth)
-        self.session = adafruit_requests.Session(pool, None)
-    def send(self, url):
+        self._initSession()
+    def send(self, url, timeout=None):
+        # self._initSession()
+        session = self.session
         print(f'get request: {url}')
-        result = self.session.get(url)
+        if timeout is None:
+            timeout = 5
+        result = session.get(url, timeout=timeout)
         print(f'... result: [{result}]')
         return result
+    def _initSession(self):
+        global pool
+        self.session = adafruit_requests.Session(pool, None)
 
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
     def __init__(self):
         super().__init__()
-        self._pool = adafruit_connection_manager.get_radio_socketpool(dev.eth)
+        self._pool = None
     def open(self):
-        srv = self.server
-        sock = self.sock = self._pool.socket()
-        ep = (ip2Str(srv.ip), srv.rawPort)
+        # pool = self._pool
+        # if pool is None:
+        #     pool = self._pool = adafruit_connection_manager.get_radio_socketpool(dev.eth.eth)
+        global pool
+        sock = self.sock = pool.socket()
+        srv = self.server; ep = (ip2Str(srv.ip), srv.rawPort)
         try:
             sock.connect(ep)
-            print(f'! sock_open', '{ep[0]}:{ep[1]}')
+            print(f'! sock_open', f'{ep[0]}:{ep[1]}')
         except Exception:
             sock = self.sock = None
             raise
@@ -140,7 +156,10 @@ hw = NS(
 # ---------- Device Initialization ----------
 dev = core.dev = core.Device()
 updateCheck = True
-def setup_eth(): dev.eth = Eth().init()
+def setup_eth():
+    global pool
+    dev.eth = Eth().init()
+    pool = adafruit_connection_manager.get_radio_socketpool(dev.eth.eth)
 def setup_req(): dev.req = WebReq()
 def setup_sock(): dev.sock = RawSocket()
 def setup_lcd(): dev.lcd = LCDCtl()

@@ -2,7 +2,10 @@ from common import *
 from config import server as srv
 import core
 from appHandlers import AppHandlers
+import json
+from time import sleep
 from os import rename, remove
+import traceback
 
 def run():
     global dev, handlers
@@ -20,24 +23,39 @@ def updateFiles():
     if not (autoUpdate and urls):
         return False
     
+    sleep(0.5)
     handlers.lcdClear(); handlers.lcdWrite('UPDATE CHECK', 0, 0)
-    url = None; lastError = None
+    url = None; lastError = None; failCount = 0
     for _url in urls:
         if not _url:
             continue
         try:
-            resp = handlers.textReq(f'{_url}/files.txt')
+            # resp = handlers.textReq(f'{_url}/files.txt')
+            resp = handlers.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt' })['data']['string']
+            print(f'<< resp', resp)
             # Update List yok ise: oto-update iptal
-            if 'Not found' in resp:
+            if not resp or 'not found' in resp.lower():
+                print('[INFO]', "'files.txt' not found, skipping...")
                 continue
-            url = _url; lastError = None
+            url = _url; lastError = None; failCount = 0
             break
         except Exception as ex:
+            # if 'repeated socket failures' in str(ex).lower():
+            #    print('[ERROR]', '‼️ Ağ arızası algılandı, durduruluyor...')
+            #    eth = handlers.dev.eth
+            #    eth.init()
+            failCount += 1
+            #if failCount >= 3:
+            #    print('[ERROR]', '‼️ Art arda 3 hata — durduruluyor...')
+            #    return False
+            print(f'[ERROR]', ex)
+            # traceback.print_exception(ex)
             lastError = ex
             continue
     
     if lastError:
-        print(lastError)
+        print('[ERROR]', lastError)
+        traceback.print_exception(lastError)
     if lastError or not url:
         return False
     
@@ -50,7 +68,8 @@ def updateFiles():
             handlers.lcdClear(); handlers.lcdWrite('UPDATING:', 0, 0)
             handlers.lcdWrite(name, 1, 2)
             # Uzak Dosyayı indir
-            fileContent = handlers.textReq(fileUrl)
+            fileContent = handlers.wsTalk('webRequest', None, { 'url': fileUrl })['data']['string']
+            # fileContent = handlers.textReq(fileUrl)
             # Yanıt boş veya yok ise sonrakine geç
             if not fileContent or 'Not found' in fileContent:
                 print('  ... NOT FOUND')
@@ -70,7 +89,8 @@ def updateFiles():
                 f.write(fileContent)
             print('  ... UPDATED')
         except Exception as ex:
-            print(ex)
+            print('[ERROR]', ex)
+            traceback.print_exc()
             continue
     handlers.lcdClear()
     return True

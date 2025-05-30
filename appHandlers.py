@@ -42,37 +42,45 @@ class AppHandlers:
         if isinstance(data, (dict, list)):
             data = json.dumps(data)
         self.sockOpen(); sock = self.dev.sock
+        if data is not None and isinstance(data, (dict, list)):
+            data = json.dumps(data)
         sock.write(data)
         return self
     def sockRecv(self, timeout=None):
         self.sockOpen(); sock = self.dev.sock
         result = sock.read() if timeout is None else sock.read(timeout)
-        if result and not isinstance(result, (dict, list)):
+        if not (result is None or isinstance(result, (dict, list))):
             result = json.loads(result)
         return result
     def sockTalk(self, data):
         self.sockOpen(); sock = self.dev.sock
-        sock.talk(data)
-        return self
+        if data is not None and isinstance(data, (dict, list)):
+            data = json.dumps(data)
+        return sock.talk(data)
     def wsSend(self, api, args = None, data = None, wsPath = None):
         return self.sockSend(self.getWSData(api, args, data, wsPath))
     def wsRecv(self, timeout=None):
         return self.sockRecv(timeout)
     def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
-        return self.sockTalk(self.getWSData(api, args, data, wsPath))
+        result = self.sockTalk(self.getWSData(api, args, data, wsPath))
+        if (isinstance(result, str)):
+            result = json.loads(result)
+        return result
     def getWSData(self, api, args = None, data = None, wsPath = None):
+        if data is not None and isinstance(data, (dict, list)):
+            data = json.dumps(data)
         return {
             'ws': wsPath or srv.wsPath, 'api': api, 'args': args,
             'data': { 'base64': False, 'data': data }
         }
     def sockClose(self):
         return self.sock.close()
-    def req(self, data):
-        return self.dev.req.send(data)
-    def textReq(self, data):
-        return self.dev.req.sendText(data)
-    def jsonReq(self, data):
-        return self.dev.req.sendJSON(data)
+    def req(self, data, timeout=None):
+        return self.dev.req.send(data, timeout)
+    def textReq(self, data, timeout=None):
+        return self.dev.req.sendText(data, timeout)
+    def jsonReq(self, data, timeout=None):
+        return self.dev.req.sendJSON(data, timeout)
     def keypadUpdate(self):
         self.dev.keypad.update()
         return self

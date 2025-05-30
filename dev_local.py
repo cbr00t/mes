@@ -20,10 +20,12 @@ class Eth:
 # ---------- Web Requests Class ----------
 class WebReq(BaseWebReq):
     def __init__(self):
-        self.eth = dev.eth
-    def send(self, url):
+        self.eth = dev.eth.eth
+    def send(self, url, timeout=None):
+        if timeout is None:
+            timeout = 8
         print(f'get request: {url}')
-        result = requests.get(url)
+        result = requests.get(url, timeout)
         print(f'... result: [{result}]')
         return result
 
@@ -35,7 +37,7 @@ class RawSocket(BaseRawSocket):
         ep = (ip2Str(srv.ip), srv.rawPort)
         try:
             sock.connect(ep)
-            print(f'! sock_open: [{ep[0]}:{ep[1]}]')
+            print(f'! sock_open', f'{ep[0]}:{ep[1]}')
         except Exception:
             sock = self.sock = None
             raise

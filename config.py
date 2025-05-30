@@ -17,7 +17,7 @@ local = NS(
 server = NS(
     wsPort                          =  8200,
     rawPort                         =  8199,
-    updatePorts                     =  [2085, 81, 80],
+    updatePorts                     =  [2085],
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  True,
     updateUrl_postfix               =  '/mes/update'
@@ -64,6 +64,7 @@ else:
 ## Ana Makine (Server) Ayarları
 ## --------------------------------
     server.ip                       =  (192, 168, 1, 48)
+
 
 
 

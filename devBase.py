@@ -2,6 +2,7 @@
 from common import *
 import config as cfg
 import json
+import traceback
 
 class BaseRawSocket:
     def __init__(self):
@@ -29,11 +30,13 @@ class BaseRawSocket:
                 except Exception: break
         except Exception as ex:
             print("[SocketError]", ex)
+            traceback.print_exception(ex)
             self.close()
         try:
             return self._decodeLine(buffer)
         except Exception as ex:
             print('[SocketDataError]', ex)
+            traceback.print_exception(ex)
             return None
 
     def write(self, data):
@@ -85,12 +88,12 @@ class BaseRawSocket:
         return data
 
 class BaseWebReq:
-    def sendText(self, url):
-        result = self.send(url).text
+    def sendText(self, url, timeout=None):
+        result = self.send(url, timeout).text
         print(result)
         return result
-    def sendJSON(self, url):
-        result = self.send(url).json()
+    def sendJSON(self, url, timeout=None):
+        result = self.send(url, timeout).json()
         print(result)
         return result
 
