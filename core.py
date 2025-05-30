@@ -16,6 +16,7 @@ if not 'dev' in globals():
 def getDevice():
     modName_device = mod.device or ('rasppico' if isCircuitPy() else 'local')
     print(f'Device Module = {modName_device}')
-    dynImport(f'dev_{modName_device}', 'mod_dev')
-    print(dev)
+    if dev is None:
+        dynImport(f'dev_{modName_device}', 'mod_dev')
+        print(dev)
     return dev

@@ -68,18 +68,16 @@ class AppHandlers:
     def sockClose(self):
         return self.sock.close()
     def req(self, data):
-        self.dev.req.send(data)
+        return self.dev.req.send(data)
     def textReq(self, data):
-        self.dev.req.sendText(data)
-        return self
+        return self.dev.req.sendText(data)
     def jsonReq(self, data):
-        self.dev.req.sendJSON(data)
-        return self
+        return self.dev.req.sendJSON(data)
     def keypadUpdate(self):
         self.dev.keypad.update()
         return self
     def checkStatus(self):
-        pass
+        return self
     def updateStatus(self, result):
         if result is not None:
             print(json.dumps(result))

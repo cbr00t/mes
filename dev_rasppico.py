@@ -139,6 +139,7 @@ hw = NS(
 
 # ---------- Device Initialization ----------
 dev = core.dev = core.Device()
+updateCheck = True
 def setup_eth(): dev.eth = Eth().init()
 def setup_req(): dev.req = WebReq()
 def setup_sock(): dev.sock = RawSocket()

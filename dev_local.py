@@ -64,6 +64,7 @@ class Keypad(BaseKeypad):
 
 
 # ---------- Device Initialization ----------
+updateCheck = False
 dev = core.dev = core.Device()
 @withErrCheck
 def setup_eth(): dev.eth = Eth().init()

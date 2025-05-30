@@ -65,8 +65,9 @@ def getUpdateUrls():
     if not srv.autoUpdate:
         return None
     updateUrl_postfix = srv.updateUrl_postfix or ''
+    ip = ip2Str(srv.ip)
     return [
-        f'http://{srv.ip}:{port}{updateUrl_postfix}'
+        f'http://{ip}:{port}{updateUrl_postfix}'
         for port in srv.updatePorts
     ]
 

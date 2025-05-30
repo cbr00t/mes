@@ -7,12 +7,11 @@ class BaseRawSocket:
     def __init__(self):
         self.server = cfg.server
         self.sock = None
-
     def isConnected(self):
         return self.sock is not None
-    
     def read(self, timeout=0.05):
-        if not self.isConnected(): return None
+        if not self.isConnected():
+            return None
         sock = self.sock; buffer = b""
         try:
             sock.settimeout(timeout)
@@ -51,18 +50,16 @@ class BaseRawSocket:
             print("[SocketError]", ex)
             self.close()
         return True 
-    
     def close(self):
         try: self.sock.close()
         except: pass
         self.sock = None
         print(f'! sock_close')
         return self
-
     def talk(self, data, timeout=None):
         self.write(data)
         return self.read(timeout)
-
+    
     def _prepareData(self, data):
         if isinstance(data, dict):
             data = json.dumps(data)
@@ -72,7 +69,6 @@ class BaseRawSocket:
         elif isinstance(data, bytes):
             return data + b"\n"
         raise TypeError("RawSocket.write(): data must be str, dict or bytes")
-
     def _decodeLine(self, buffer):
         if not buffer:
             return None
@@ -93,7 +89,6 @@ class BaseWebReq:
         result = self.send(url).text
         print(result)
         return result
-
     def sendJSON(self, url):
         result = self.send(url).json()
         print(result)
