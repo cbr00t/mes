@@ -1,3 +1,4 @@
+from time import monotonic
 
 # ---------- General Structures ----------
 class NS:
@@ -52,7 +53,6 @@ def splitext(filepath):
     if len(parts) == 2:
         return parts[0], '.' + parts[1]
     return filepath, ''
-
 def exists(fname):
     try:
         with open(fname): pass
@@ -70,7 +70,6 @@ def getUpdateUrls():
         f'http://{ip}:{port}{updateUrl_postfix}'
         for port in srv.updatePorts
     ]
-
 def getWSUrl(qs = None, wsPath = None, api = None, https = None):
     from config import local, server as srv
     if https is None: https = False;
@@ -85,4 +84,22 @@ def getWSUrl(qs = None, wsPath = None, api = None, https = None):
             result += f'&{str(key)}'
             if value: result += f'={value}'
     return result.rstrip('&')
+def getHeartbeatInterval():
+    from config import server as srv
+    hearbeatInterval = srv.hearbeatInterval
+    if (isIdle()):
+        hearbeatInterval *= 10
+    return hearbeatInterval
+
+_lastBusyTime = None
+def isIdle():
+    from config import local
+    idleTime = local.idleTime
+    if (idleTime or 0) <= 0:
+        return False
+    return _lastBusyTime and monotonic() - _lastBusyTime > idleTime
+def busy():
+    global _lastBusyTime
+    _lastBusyTime = monotonic()
+
 

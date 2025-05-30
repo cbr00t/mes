@@ -7,7 +7,7 @@ import core
 class AppHandlers:
     def __init__(self, dev = None):
         self.dev = dev
-        self._keypad_lastTime = None
+        self._lcdStatus_lastTime = self._keypad_lastTime = self._lastHeartbeatTime = None
         # sock = dev.sock; req = dev.req
         # lcd = dev.lcd; keypad = dev.keypad
         keypad = dev.keypad
@@ -23,6 +23,7 @@ class AppHandlers:
         return self
     def lcdWrite(self, text, row=0, col=0):
         self.dev.lcd.write(text, row, col)
+        self._lcdStatus_lastTime = monotonic()
         return self
     def lcdClear(self):
         self.dev.lcd.clear()
@@ -69,12 +70,26 @@ class AppHandlers:
         if (isinstance(result, str)):
             result = json.loads(result)
         return result
+    def wsHeartbeat(self, timeout=None):
+        try:
+            if (self._lastHeartbeatTime or False) <= 0:                   # no check at startup
+                return True
+            result = self.wsTalk('ping')
+            if not result:
+                raise RuntimeError('empty data')
+            return True
+        except Exception:
+            self.sockClose()
+            self.sockOpen()
+            return False
+        finally:
+            self._lastHeartbeatTime = monotonic()
     def getWSData(self, api, args = None, data = None, wsPath = None):
         if data is not None and isinstance(data, (dict, list)):
             data = json.dumps(data)
         return {
             'ws': wsPath or srv.wsPath, 'api': api, 'args': args,
-            'data': { 'base64': False, 'data': data }
+            'data': { 'data': data }
         }
     def sockClose(self):
         return self.dev.sock.close()
@@ -101,7 +116,11 @@ class AppHandlers:
         print(f'key_release: [{key}:{duration}]')
         key = key.lower()
         _id = 'primary' if key == '0' or key == 'enter' else key
-        delayMS = monotonic() - self._keypad_lastTime if self._keypad_lastTime else 0
-        self.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS })
+        delayMS = int((monotonic() - self._keypad_lastTime) * 1000) if self._keypad_lastTime else 0
+        busy()
+        self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'TUS GONDER: [{key}]...', 2, 1)
+        result = self.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS })
+        self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'* [{key}] GONDERILDI', 2, 1)
+        return result
 
 

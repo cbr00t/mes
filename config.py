@@ -9,7 +9,8 @@ from common import *
 ## --------------------------------
 local = NS(
     subnet                          =  (255, 255, 255, 0),
-    dns                             =  (1, 1, 1, 1)
+    dns                             =  (1, 1, 1, 1),
+    idleTime                        =  60
 )
 
 ## Ana Makine (Server) Ayarları
@@ -20,7 +21,8 @@ server = NS(
     updatePorts                     =  [2085],
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  True,
-    updateUrl_postfix               =  '/mes/update'
+    updateUrl_postfix               =  '/mes/update',
+    hearbeatInterval                =  15                                 # in secs. ( <= 0 Or None ) = no heartbeat
 )
 
 ## Modül Ayarları

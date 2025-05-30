@@ -11,6 +11,7 @@ def run():
     global dev, handlers
     dev = core.getDevice()
     handlers = AppHandlers(dev)
+    busy()
     updateFiles()
     boot()
 
@@ -24,6 +25,13 @@ def updateFiles():
         return False
     
     sleep(0.5)
+    if not handlers.sockIsConnected():
+        handlers.sockOpen()
+    if handlers.sockIsConnected():
+        handlers.wsHeartbeat()
+    if not handlers.sockIsConnected():
+        return False
+        
     handlers.lcdClear(); handlers.lcdWrite('UPDATE CHECK', 0, 0)
     url = None; lastError = None; failCount = 0
     for _url in urls:
@@ -33,6 +41,7 @@ def updateFiles():
             # resp = handlers.textReq(f'{_url}/files.txt')
             resp = handlers.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt' })['data']['string']
             print(f'<< resp', resp)
+            resp = resp['data']['string'] if isinstance(resp, dict) else None
             # Update List yok ise: oto-update iptal
             if not resp or 'not found' in resp.lower():
                 print('[INFO]', "'files.txt' not found, skipping...")
@@ -63,12 +72,14 @@ def updateFiles():
         name = name.strip()
         if not name:
             continue
+        busy()
         try:
             fileUrl = f'{url}/{name}'
             handlers.lcdClear(); handlers.lcdWrite('UPDATING:', 0, 0)
             handlers.lcdWrite(name, 1, 2)
             # Uzak Dosyayı indir
-            fileContent = handlers.wsTalk('webRequest', None, { 'url': fileUrl })['data']['string']
+            fileContent = handlers.wsTalk('webRequest', None, { 'url': fileUrl })
+            fileContent = fileContent['data']['string'] if isinstance(fileContent, dict) else None
             # fileContent = handlers.textReq(fileUrl)
             # Yanıt boş veya yok ise sonrakine geç
             if not fileContent or 'Not found' in fileContent:

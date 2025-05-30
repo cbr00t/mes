@@ -12,6 +12,7 @@ from devBase import *
 class Eth:
     def __init__(self):
         local = cfg.local
+        self.eth = None
         self.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
     def init(self):
         print("[LocalEth] initialized with:", self.ifconfig)

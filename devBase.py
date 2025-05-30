@@ -1,6 +1,7 @@
 ### 📁 devBase.py (Ortak Modül)
 from common import *
 import config as cfg
+from time import sleep, monotonic
 import json
 import traceback
 
@@ -10,35 +11,42 @@ class BaseRawSocket:
         self.sock = None
     def isConnected(self):
         return self.sock is not None
-    def read(self, timeout=0.05):
+    def read(self, timeout=None):
+        if timeout is None:
+            timeout = 5
         if not self.isConnected():
-            return None
+            self.open()
         sock = self.sock; buffer = b""
         try:
+            sock.settimeout(0.1)
+            chunk = sock.recv(128)
+            buffer += chunk
             sock.settimeout(timeout)
-            try:
-                chunk = sock.recv(4096)
-                buffer += chunk
-            except Exception:
-                return None
-            self.sock.settimeout(None)
             while b"\n" not in buffer:
-                try:
-                    chunk = sock.recv(4096)
-                    if not chunk: break
-                    buffer += chunk
-                except Exception: break
+                chunk = sock.recv(128)
+                if not chunk: break
+                buffer += chunk
+        except (TimeoutError, RuntimeError):
+            return None
+        except OSError as ex:
+            errNo = None
+            try: errNo = ex.errno                          # pylocal
+            except AttributeError: errNo = ex.args[0]      # pycircuit
+            if errNo == 116:    # possible timeout
+                return None
+            print('oserr', errNo)
+            if errNo == 10054:
+                self.close()
+            raise
         except Exception as ex:
             print("[SocketError]", ex)
             traceback.print_exception(ex)
-            self.close()
         try:
             return self._decodeLine(buffer)
         except Exception as ex:
             print('[SocketDataError]', ex)
             traceback.print_exception(ex)
             return None
-
     def write(self, data):
         if not self.isConnected(): return False
         buffer = self._prepareData(data)
@@ -46,12 +54,15 @@ class BaseRawSocket:
         try:
             while totalSize < len(buffer):
                 size = sock.send(buffer[totalSize:])
-                if size == 0: raise RuntimeError('Socket connection broken during send')
+                if size == 0:
+                    self.close()
+                    raise RuntimeError('Socket connection broken during send')
                 totalSize += size
             print(f'> sock_send {totalSize}  Data: {data}')
         except Exception as ex:
             print("[SocketError]", ex)
             self.close()
+            return False
         return True 
     def close(self):
         try: self.sock.close()
