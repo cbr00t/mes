@@ -16,6 +16,9 @@ class AppHandlers:
             keypad.set_onRelease(self.keypad_onReleased)
     
     ## Handler API Interface
+    def exec(self, code):
+        result = exec(code, globals())
+        return result
     def reboot(self):
         import microcontroller
         print('rebooting...')

@@ -64,7 +64,7 @@ def loop():
             handler = getattr(handlers, action, None)
             if handler is None:
                 print('[ERROR]  no matching handler', action)
-                wsSend('errorCallback', { 'data': f'{action} action gecersizdir' })
+                # wsSend('errorCallback', { 'data': f'{action} action gecersizdir' })
                 continue
             args = []
             if 'args' in item:
@@ -76,7 +76,7 @@ def loop():
                 handler(*args)                                                    # ← [js]  handler.call(this, ...args) karşılığı
             except Exception as ex:
                 print(f'[ERROR]  handler execution failed: {ex}')
-                wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
+                # wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
     handlers.keypadUpdate()
     cpuHaltTime = 0.5 if isIdle() else 0.1
     sleep(cpuHaltTime)
