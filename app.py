@@ -18,6 +18,7 @@ def run():
 def loop():
     wsRecv = handlers.wsRecv; wsSend = handlers.wsSend; wsTalk = handlers.wsTalk
     connected = handlers.sockIsConnected()
+    # print('sock isConnected:', connected)
     if not connected:
         ip = ip2Str(srv.ip); port = srv.rawPort
         handlers.lcdClear()

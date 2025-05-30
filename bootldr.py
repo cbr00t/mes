@@ -93,6 +93,7 @@ def updateFiles():
             traceback.print_exc()
             continue
     handlers.lcdClear()
+    handlers.sockClose()
     return True
 
 def boot():

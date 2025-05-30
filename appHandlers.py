@@ -57,6 +57,9 @@ class AppHandlers:
         if data is not None and isinstance(data, (dict, list)):
             data = json.dumps(data)
         return sock.talk(data)
+    def sockClose(self):
+        self.sock.close()
+        return self
     def wsSend(self, api, args = None, data = None, wsPath = None):
         return self.sockSend(self.getWSData(api, args, data, wsPath))
     def wsRecv(self, timeout=None):
@@ -74,7 +77,7 @@ class AppHandlers:
             'data': { 'base64': False, 'data': data }
         }
     def sockClose(self):
-        return self.sock.close()
+        return self.dev.sock.close()
     def req(self, data, timeout=None):
         return self.dev.req.send(data, timeout)
     def textReq(self, data, timeout=None):
