@@ -1,16 +1,58 @@
 ### 📁 devBase.py (Ortak Modül)
 from common import *
-import config as cfg
+from config import server as srv
 from time import sleep, monotonic
 import json
 import traceback
 
+class BaseEth:
+    def __init__(self):
+        self.eth = None
+    def init(self):
+        pass
+
 class BaseRawSocket:
     def __init__(self):
-        self.server = cfg.server
+        self.server = srv
         self.sock = None
     def isConnected(self):
         return self.sock is not None
+    def open(self):
+        pass
+    def __iptal_read(self, timeout=None):
+        if timeout is None:
+            timeout = 5
+        if not self.isConnected():
+            self.open()
+        sock = self.sock; buffer = b""
+        start_time = monotonic()
+        try:
+            sock.settimeout(0.05)
+            while True:
+                try:
+                    chunk = sock.recv(64)
+                    if not chunk:
+                        break
+                    buffer += chunk
+                    if b"\n" in buffer:
+                        break
+                except Exception:
+                    # Timeout vs. normal hata farkı yapılabilir ama burada kısa beklemeye devam
+                    pass
+                if (monotonic() - start_time) > timeout:
+                    return None
+        except Exception as ex:
+            print("[SocketError]", ex)
+            traceback.print_exception(ex)
+            return None
+
+        # Mesaj tam ise işleme al
+        try:
+            return self._decodeLine(buffer)
+        except Exception as ex:
+            print('[SocketDataError]', ex)
+            traceback.print_exception(ex)
+            return None
     def read(self, timeout=None):
         if timeout is None:
             timeout = 5
@@ -18,21 +60,24 @@ class BaseRawSocket:
             self.open()
         sock = self.sock; buffer = b""
         try:
-            sock.settimeout(0.1)
-            chunk = sock.recv(128)
-            buffer += chunk
-            sock.settimeout(timeout)
-            while b"\n" not in buffer:
-                chunk = sock.recv(128)
-                if not chunk: break
+            sock.settimeout(0.05)
+            chunk = sock.recv(1)
+            if chunk:
+                busy()
                 buffer += chunk
+                sock.settimeout(timeout)
+                while b"\n" not in buffer:
+                    busy()
+                    chunk = sock.recv(256)
+                    if not chunk: break
+                    buffer += chunk
         except (TimeoutError, RuntimeError):
             return None
         except OSError as ex:
             errNo = None
             try: errNo = ex.errno                          # pylocal
             except AttributeError: errNo = ex.args[0]      # pycircuit
-            if errNo == 116:    # possible timeout
+            if errNo == 116:                               # possible timeout
                 return None
             print('oserr', errNo)
             if errNo == 10054:
@@ -53,6 +98,7 @@ class BaseRawSocket:
         sock = self.sock; totalSize = 0
         try:
             while totalSize < len(buffer):
+                busy()
                 size = sock.send(buffer[totalSize:])
                 if size == 0:
                     self.close()
@@ -99,6 +145,10 @@ class BaseRawSocket:
         return data
 
 class BaseWebReq:
+    def __init__(self):
+        self._initSession()
+    def send(self, url, timeout=None):
+        self.send(url, timeout)
     def sendText(self, url, timeout=None):
         result = self.send(url, timeout).text
         print(result)
@@ -107,8 +157,12 @@ class BaseWebReq:
         result = self.send(url, timeout).json()
         print(result)
         return result
+    def _initSession(self):
+        pass
 
 class BaseKeypad:
+    def __init__(self, onPress = None, onRelease = None):
+        pass
     def update(self):
         return self
     def set_onPress(self, handler):
@@ -117,4 +171,25 @@ class BaseKeypad:
     def set_onRelease(self, handler):
         self.onRelease = handler
         return self
+
+class BaseLCD:
+    def clear(self):
+        return self
+    def write(self, data, row=0, col=0):
+        return self
+    def on():
+        return self
+    def off():
+        return self
+
+class BaseLED:
+    def write(self, rgb, col):
+        return self
+    def clear(self, col):
+        return self.write((0, 0, 0), col)
+
+class BaseRFID:
+    def read(self):
+        return None
+
 

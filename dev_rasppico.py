@@ -1,49 +1,52 @@
 # ---------- dev_rasppico.py (Güncellenmiş) ----------
 from common import *
 import core
-import config as cfg
+from config import local, server as srv, hw
 from devBase import *
 from time import sleep, monotonic
-import board
-import digitalio
-import busio
-from lcd.lcd import LCD
-from lcd.i2c_pcf8574_interface import I2CPCF8574Interface
-from adafruit_matrixkeypad import Matrix_Keypad
-import adafruit_connection_manager
-import adafruit_requests
-from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+import traceback
+
+try:
+    import board
+    import digitalio
+    import busio
+    from lcd.lcd import LCD
+    from lcd.i2c_pcf8574_interface import I2CPCF8574Interface
+    from adafruit_matrixkeypad import Matrix_Keypad
+    import adafruit_connection_manager
+    import adafruit_requests
+    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+except (Exception):
+    pass
 
 
 # ---------- Ethernet Class ----------
-class Eth:
+class Eth(BaseEth):
     def __init__(self):
-        self._spi = self._cs = self.eth = None
+        super().__init__()
+        self._spi = self._cs = None
     def init(self):
-        local = cfg.local; is_dhcp = not local.ip
+        is_dhcp = not local.ip
         spi = self._spi; cs = self._cs; eth = self.eth
-        if spi is not None:
-            spi.deinit()
-            spi = None
+        if spi is not None: spi.deinit(); spi = None
         if cs is None:
-            cs = self._cs = digitalio.DigitalInOut(board.GP17)
+            cs = self._cs = digitalio.DigitalInOut(board.GP17) if 'digitalio' in globals() else None
         if spi is None:
-            spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16)
-        eth = self.eth = WIZNET5K(spi, cs, is_dhcp=is_dhcp)
-        if not is_dhcp:
-            eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
-        while not eth.link_status:
-            print("eth init...")
-            sleep(0.5)
+            spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16) if 'busio' in globals() else None
+        eth = self.eth = WIZNET5K(spi, cs, is_dhcp=is_dhcp) if 'WIZNET5K' in globals() else self
+        if not is_dhcp: eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
+        try:
+            while not eth.link_status:
+                print("eth init...")
+                sleep(0.5)
+        except AttributeError:
+            pass
         return self
 
 # ---------- Web Requests Class ----------
 class WebReq(BaseWebReq):
-    def __init__(self):
-        self._initSession()
     def send(self, url, timeout=None):
-        # self._initSession()
-        session = self.session
+        super().send(url, timeout); session = self.session
         print(f'get request: {url}')
         if timeout is None:
             timeout = 5
@@ -51,8 +54,8 @@ class WebReq(BaseWebReq):
         print(f'... result: [{result}]')
         return result
     def _initSession(self):
-        global pool
-        self.session = adafruit_requests.Session(pool, None)
+        # global pool
+        self.session = adafruit_requests.Session(pool, None) if 'adafruit_requests' in globals() else None
 
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
@@ -60,10 +63,7 @@ class RawSocket(BaseRawSocket):
         super().__init__()
         self._pool = None
     def open(self):
-        # pool = self._pool
-        # if pool is None:
-        #     pool = self._pool = adafruit_connection_manager.get_radio_socketpool(dev.eth.eth)
-        global pool
+        super().open(); global pool
         sock = self.sock = pool.socket()
         srv = self.server; ep = (ip2Str(srv.ip), srv.rawPort)
         try:
@@ -74,35 +74,17 @@ class RawSocket(BaseRawSocket):
             raise
         return self
 
-# ---------- LCD Control Class ----------
-class LCDCtl:
-    def __init__(self):
-        i2c = busio.I2C(board.GP1, board.GP0)
-        interface = I2CPCF8574Interface(i2c, 0x27)
-        lcd = self.lcd = LCD(interface, num_rows=4, num_cols=20)
-        lcd.set_backlight(True)
-        lcd.clear()
-    def clear(self):
-        self.lcd.clear()
-        print('lcdClear')
-        return self
-    def write(self, data, row=0, col=0):
-        lcd = self.lcd
-        lcd.set_cursor_pos(row, col)
-        lcd.print(data)
-        print('lcdWrite', data)
-        return self
-
 # ---------- Keypad Control Class ----------
 class Keypad(BaseKeypad):
     def __init__(self, onPressed = None, onRelease = None):
         super().__init__()
         self.onPressed = onPressed
         self.onRelease = onRelease
-        rows = [getattr(board, pin) for pin in hw.rows]
-        cols = [getattr(board, pin) for pin in hw.cols]
-        keys = hw.keys
-        self.keypad = Matrix_Keypad(rows, cols, keys)
+        keypadCfg = hw.keypad
+        rows = [getattr(board, pin) for pin in keypadCfg.rows] if 'board' in globals() else keypadCfg.rows
+        cols = [getattr(board, pin) for pin in keypadCfg.cols] if 'board' in globals() else keypadCfg.cols
+        keys = keypadCfg.keys
+        self.keypad = Matrix_Keypad(rows, cols, keys) if 'Matrix_Keypad' in globals() else NS()
         self._pressed = {}
         # Performans için ek değişkenler
         self._last_scan_time = monotonic()
@@ -142,29 +124,58 @@ class Keypad(BaseKeypad):
             print(f"Keypad tarama hatası: {ex}")
         return self
 
+# ---------- LCD Control Class ----------
+class LCDCtl(BaseLCD):
+    def __init__(self):
+        super().__init__()
+        i2c = busio.I2C(board.GP1, board.GP0) if 'busio' in globals() else None
+        interface = I2CPCF8574Interface(i2c, 0x27) if 'I2CPCF8574Interface' in globals() else None
+        lcdCfg = hw.lcd
+        lcd = self.lcd = LCD(interface, num_rows=lcdCfg.rows, num_cols=lcdCfg.cols) if 'LCD' in globals() else None
+        if lcd is not None:
+            lcd.set_backlight(True)
+            lcd.clear()
+    def clear(self):
+        super().clear()
+        self.lcd.clear()
+        print('lcdClear')
+        return self
+    def write(self, data, row=0, col=0):
+        super().write(data, row, col)
+        lcd = self.lcd
+        lcd.set_cursor_pos(row, col)
+        lcd.print(data)
+        print('lcdWrite', data)
+        # if not data.strip():
+        #     raise RuntimeError()
+        return self
+    def on():
+        self.lcd.set_backlight(True)
+        return self
+    def off():
+        self.lcd.set_backlight(False)
+        return self
 
-hw = NS(
-    rows = ['GP12', 'GP13', 'GP14', 'GP15'],
-    cols = ['GP7', 'GP8', 'GP9', 'GP10', 'GP11'],
-    keys = [
-        ['F1', '1', '2', '3', 'X'],
-        ['F2', '4', '5', '6', '^'],
-        ['F3', '7', '8', '9', 'V'],
-        ['F4', 'ESC', '0', 'ENTER', None]
-    ]
-)
+class LEDCtl(BaseLED):
+    pass
+
+class RFIDCtl(BaseRFID):
+    pass
+
 
 # ---------- Device Initialization ----------
 dev = core.dev = core.Device()
 updateCheck = True
 def setup_eth():
     global pool
-    dev.eth = Eth().init()
-    pool = adafruit_connection_manager.get_radio_socketpool(dev.eth.eth)
+    eth = dev.eth = Eth().init(); _eth = eth.eth 
+    pool = adafruit_connection_manager.get_radio_socketpool(_eth) if 'adafruit_connection_manager' in globals() else None
 def setup_req(): dev.req = WebReq()
 def setup_sock(): dev.sock = RawSocket()
-def setup_lcd(): dev.lcd = LCDCtl()
 def setup_keypad(): dev.keypad = Keypad()
-steps = [setup_eth, setup_req, setup_sock, setup_lcd, setup_keypad]
+def setup_lcd(): dev.lcd = LCDCtl()
+def setup_led(): dev.led = LEDCtl()
+def setup_rfid(): dev.rfid = RFIDCtl()
+steps = [setup_eth, setup_req, setup_sock, setup_keypad, setup_lcd, setup_led, setup_rfid]
 for step in steps:
     step()

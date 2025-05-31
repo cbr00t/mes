@@ -39,7 +39,7 @@ def updateFiles():
             continue
         try:
             # resp = handlers.textReq(f'{_url}/files.txt')
-            resp = handlers.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt' })['data']['string']
+            resp = handlers.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt' })
             print(f'<< resp', resp)
             resp = resp['data']['string'] if isinstance(resp, dict) else None
             # Update List yok ise: oto-update iptal

@@ -22,7 +22,7 @@ server = NS(
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  True,
     updateUrl_postfix               =  '/mes/update',
-    hearbeatInterval                =  15                                 # in secs. ( <= 0 Or None ) = no heartbeat
+    hearbeatInterval                =  10                                 # in secs. ( <= 0 Or None ) = no heartbeat
 )
 
 ## Modül Ayarları
@@ -30,6 +30,25 @@ server = NS(
 mod = NS(
     ### device: [ None, 'local', 'rasppico' ]
     device                          =  None
+)
+
+## Hardware Ayarları
+## --------------------------------
+hw = NS(
+    keypad = NS(
+        rows = ['GP12', 'GP13', 'GP14', 'GP15'],
+        cols = ['GP7', 'GP8', 'GP9', 'GP10', 'GP11'],
+        keys = [
+            ['F1', '1', '2', '3', 'X'],
+            ['F2', '4', '5', '6', '^'],
+            ['F3', '7', '8', '9', 'V'],
+            ['F4', 'ESC', '0', 'ENTER', None]
+        ]
+    ),
+    lcd = NS(
+        rows = 4,
+        cols = 20
+    )
 )
 
 
@@ -59,7 +78,7 @@ else:
 
 ## Cihaz Ayarları
 ## --------------------------------
-    local.ip                        =  (192, 168, 1, 50)
+    local.ip                        =  (192, 168, 1, 48)
     local.gateway                   =  (192, 168, 1, 1)
 
 

@@ -16,6 +16,12 @@ class NS:
         attrs = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())
         return f'NS({attrs})'
 
+
+# Global Vars
+_lastBusyTime = None
+
+
+# Functions
 def str2IP(value):
     return None if value is None else tuple(map(int, value.split('.')))
 def ip2Str(value):
@@ -85,19 +91,21 @@ def getWSUrl(qs = None, wsPath = None, api = None, https = None):
             if value: result += f'={value}'
     return result.rstrip('&')
 def getHeartbeatInterval():
+    if isBusy():
+        return None
     from config import server as srv
     hearbeatInterval = srv.hearbeatInterval
-    if (isIdle()):
-        hearbeatInterval *= 10
+    if isIdle():
+        return hearbeatInterval * 3
     return hearbeatInterval
-
-_lastBusyTime = None
 def isIdle():
     from config import local
     idleTime = local.idleTime
     if (idleTime or 0) <= 0:
         return False
     return _lastBusyTime and monotonic() - _lastBusyTime > idleTime
+def isBusy():
+    return _lastBusyTime and monotonic() - _lastBusyTime <= 3
 def busy():
     global _lastBusyTime
     _lastBusyTime = monotonic()

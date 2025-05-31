@@ -8,8 +8,10 @@ class Device:
         self.eth = kwargs.get('eth')
         self.req = kwargs.get('req')
         self.sock = kwargs.get('sock')
-        self.lcd = kwargs.get('lcd')
         self.keypad = kwargs.get('keypad')
+        self.lcd = kwargs.get('lcd')
+        self.led = kwargs.get('led')
+        self.rfid = kwargs.get('rfid')
 
 # Initialization
 if not 'dev' in globals():
