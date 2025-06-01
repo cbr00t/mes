@@ -1,14 +1,12 @@
-from time import sleep, monotonic
-import json
 from common import *
 from config import local, server as srv
-import core
+from time import sleep, monotonic
+import json
+from traceback import print_exception
 
 class AppHandlers:
-    def __init__(self, dev = None):
-        self.dev = dev
-        self._lcdStatus_lastTime = self._ledStatus_lastTime = None
-        self._keypad_lastTime = self._lastHeartbeatTime = None
+    def __init__(self):
+        dev = self.dev = shared.dev
         # sock = dev.sock; req = dev.req
         # lcd = dev.lcd; keypad = dev.keypad
         keypad = dev.keypad
@@ -25,74 +23,41 @@ class AppHandlers:
         print('rebooting...')
         microcontroller.reset()
         return self
+    def ethIsConnected(self):
+        return self.dev.eth.isConnected()
     def sockIsConnected(self):
         return self.dev.sock.isConnected()
     def sockOpen(self, statusCheckMessage=None):
-        sock = self.dev.sock
-        if (not sock.isConnected()):
-            sock.open()
-            payload = statusCheckMessage or self.getWSData('getSessionInfo')
-            if isinstance(payload, (dict, list)):
-                payload = json.dumps(payload)
-            sock.talk(payload)
+        self.dev.sock.open()
         return self
     def sockSend(self, data):
-        if isinstance(data, (dict, list)):
-            data = json.dumps(data)
-        self.sockOpen(); sock = self.dev.sock
-        if data is not None and isinstance(data, (dict, list)):
-            data = json.dumps(data)
-        sock.write(data)
+        self.dev.sock.send(data)
         return self
     def sockRecv(self, timeout=None):
-        self.sockOpen(); sock = self.dev.sock
-        result = sock.read() if timeout is None else sock.read(timeout)
-        if result:
-            print('[sockRecv]  data:', result)
-            self._lastHeartbeatTime = monotonic()                                  # basarili bir veri alimi olduysa baglanti gecerlidir, sonra kontrol et
-        return result
+        return self.dev.sock.recv(timeout)
     def sockTalk(self, data, timeout=None):
-        self.sockSend(data).sockRecv(data)
+        return self.dev.sock.talk(data, timeout)
+    def sockSendJSON(self, data):
+        self.dev.sock.sendJSON(data)
+        return self
+    def sockRecvJSON(self, timeout=None):
+        return self.dev.sock.recvJSON(timeout)
+    def sockTalkJSON(self, data, timeout=None):
+        return self.dev.sock.talkJSON(data, timeout)
     def sockClose(self):
         self.sock.close()
         return self
     def wsSend(self, api, args = None, data = None, wsPath = None):
-        return self.sockSend(self.getWSData(api, args, data, wsPath))
+        self.dev.sock.wsSend(api, args, data, wsPath)
+        return self
     def wsRecv(self, timeout=None):
-        result = self.sockRecv(timeout)
-        if not (result is None or isinstance(result, (dict, list))):
-            if result and isinstance(result, str):
-                for check in [('{', '}'), ('[', ']')]:
-                    if not result.startswith(check[0]) and result.endswith(check[1]):
-                        result = check[0] + result
-                    elif result.startswith(check[0]) and not result.endswith(check[1]):
-                        result += check[1]
-            result = json.loads(result)
-        return result
+        return self.dev.sock.wsRecv(timeout)
     def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
-        return self.wsSend(api, args, data, wsPath).wsRecv(timeout)
+        return self.dev.sock.wsTalk(api, args, data, wsPath, timeout)
     def wsHeartbeat(self, timeout=None):
-        try:
-            if (self._lastHeartbeatTime or False) <= 0:                   # no check at startup
-                return True
-            result = self.wsTalk('ping')
-            print('[wsHeartbeat] ', result)
-            if not result:
-                raise RuntimeError('empty data')
-            return True
-        except Exception:
-            self.sockClose()
-            self.sockOpen()
-            return False
-        finally:
-            self._lastHeartbeatTime = monotonic()
+        return self.dev.sock.wsHeartbeat(timeout)
     def getWSData(self, api, args = None, data = None, wsPath = None):
-        if data is not None and isinstance(data, (dict, list)):
-            data = json.dumps(data)
-        return {
-            'ws': wsPath or srv.wsPath, 'api': api, 'args': args,
-            'data': { 'data': data }
-        }
+        return getWSData(api, args, data, wsPath)
     def sockClose(self):
         return self.dev.sock.close()
     def req(self, data, timeout=None):
@@ -102,15 +67,24 @@ class AppHandlers:
     def jsonReq(self, data, timeout=None):
         return self.dev.req.sendJSON(data, timeout)
     def lcdWrite(self, text, row=0, col=0):
-        self._lcdStatus_lastTime = monotonic()
+        shared._lastLCDTime = monotonic()
         self.dev.lcd.write(text, row, col)
+        return self
+    def lcdClearLine(self, row):
+        shared._lastLCDTime = None
+        lcd = self.dev.lcd
+        if isinstance(row, (list, range)):
+            for _row in row:
+                lcd.clearLine(_row)
+        else:
+            lcd.clearLine(row)
         return self
     def lcdClear(self):
         self.dev.lcd.clear()
         return self
     def ledWrite(self, rgb, col=0):
         self.dev.led.write(rgb, col)
-        self._ledStatus_lastTime = monotonic()
+        shared._lastLEDTime = monotonic()
         return self
     def ledClear(self):
         self.dev.led.clear()
@@ -125,19 +99,28 @@ class AppHandlers:
     def updateStatus(self, result):
         if result is not None:
             print(json.dumps(result))
-
+    
+    # status checks
+    def lcdIsBusy(self):
+        return lcdIsBusy()
+    def lcdCanBeCleared(self):
+        return lcdCanBeCleared()
+    def heartbeatShouldBeChecked():
+        return heartbeatShouldBeChecked()
+    
     ## Event Handlers
     def keypad_onPressed(self, key):
-        self._keypad_lastTime = monotonic()
+        shared._lastKeypadTime = monotonic()
         print(f'key_press: [{key}]')
     def keypad_onReleased(self, key, duration):
         print(f'key_release: [{key}:{duration}]')
         key = key.lower()
         _id = 'primary' if key == '0' or key == 'enter' else key
-        delayMS = int((monotonic() - self._keypad_lastTime) * 1000) if self._keypad_lastTime else 0
-        busy()
-        self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'TUS GONDER: [{key}]...', 2, 1)
-        result = self.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS })
+        lastTime = shared._lastKeypadTime
+        delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
+        busy(); self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'TUS GONDER: [{key}]...', 2, 1)
+        self.wsSend('fnIslemi', { 'id': _id, 'delayMS': delayMS })
+        result = self.wsRecv(0)
         self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'* [{key}] GITTI', 2, 0)
         return None
 

@@ -1,86 +1,74 @@
 from common import *
 from config import server as srv
-import core
-from appHandlers import AppHandlers
 import json
 from time import sleep
 from os import rename, remove
-import traceback
+from traceback import print_exception
 
 def run():
-    global dev, handlers
-    dev = core.getDevice()
-    handlers = AppHandlers(dev)
-    busy()
-    updateFiles()
+    globalInit(); dev = shared.dev; lcd = dev.lcd
+    lcd.off(); lcd.on()
+    ethWait(); updateFiles()
     boot()
 
+def ethWait():
+    dev = shared.dev; eth = dev.eth; lcd = dev.lcd
+    if not lcdIsBusy():
+        lcd.clearLine(1); lcd.write('Ethernet bekleniyor...', 1, 1)
+    while not eth.isConnected():
+        print('waiting for ethernet conn')
+    sleep(0.2)
 def updateFiles():
     autoUpdate = srv.autoUpdate; urls = getUpdateUrls()
-    if autoUpdate is None:
-        autoUpdate = (dev.autoUpdate if 'autoUpdate' in dev else None)
-    if autoUpdate is None:
-        autoUpdate = False
+    if autoUpdate is None: autoUpdate = shared.updateCheck != False
+    if autoUpdate is None: autoUpdate = False
     if not (autoUpdate and urls):
         return False
     
-    sleep(0.5)
-    if not handlers.sockIsConnected():
-        handlers.sockOpen()
-    if handlers.sockIsConnected():
-        handlers.wsHeartbeat()
-    if not handlers.sockIsConnected():
+    dev = shared.dev; eth = dev.eth; sock = dev.sock; lcd = dev.lcd
+    busy()
+    if not sock.isConnected():
+        sock.open()
+    # if sock.isConnected(): wsHeartbeat()
+    if not sock.isConnected():
         return False
-        
-    handlers.lcdClear(); handlers.lcdWrite('UPDATE CHECK', 0, 0)
-    url = None; lastError = None; failCount = 0
+    
+    if not lcdIsBusy():
+        lcd.clearLine(1)
+        lcd.write('UPDATE CHECK', 1, 1)
+    url = None; lastError = None
     for _url in urls:
-        if not _url:
-            continue
+        if not _url: continue
         try:
-            # resp = handlers.textReq(f'{_url}/files.txt')
-            resp = handlers.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt' })
+            # resp = req.sendText(f'{_url}/files.txt')
+            resp = sock.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt' })
             print(f'<< resp', resp)
             resp = resp['data']['string'] if isinstance(resp, dict) else None
             # Update List yok ise: oto-update iptal
             if not resp or 'not found' in resp.lower():
                 print('[INFO]', "'files.txt' not found, skipping...")
                 continue
-            url = _url; lastError = None; failCount = 0
+            url = _url; lastError = None
             break
         except Exception as ex:
-            # if 'repeated socket failures' in str(ex).lower():
-            #    print('[ERROR]', '‼️ Ağ arızası algılandı, durduruluyor...')
-            #    eth = handlers.dev.eth
-            #    eth.init()
-            failCount += 1
-            #if failCount >= 3:
-            #    print('[ERROR]', '‼️ Art arda 3 hata — durduruluyor...')
-            #    return False
-            print(f'[ERROR]', ex)
-            # traceback.print_exception(ex)
-            lastError = ex
+            lastError = ex; print(f'[ERROR]', ex)
             continue
-    
     if lastError:
-        print('[ERROR]', lastError)
-        traceback.print_exception(lastError)
+        print('[ERROR]', lastError); print_exception(lastError)
     if lastError or not url:
         return False
-    
     for name in resp.split('\n'):
         name = name.strip()
-        if not name:
-            continue
-        busy()
+        if not name: continue
         try:
-            fileUrl = f'{url}/{name}'
-            handlers.lcdClear(); handlers.lcdWrite('UPDATING:', 0, 0)
-            handlers.lcdWrite(name, 1, 2)
+            busy(); fileUrl = f'{url}/{name}'
+            if not lcdIsBusy():
+                lcd.clear(); lcd.write('UPDATING:', 0, 0)
+                lcd.write(name, 1, 2)
             # Uzak Dosyayı indir
-            fileContent = handlers.wsTalk('webRequest', None, { 'url': fileUrl })
+            fileContent = sock.wsTalk('webRequest', None, { 'url': fileUrl })
             fileContent = fileContent['data']['string'] if isinstance(fileContent, dict) else None
-            # fileContent = handlers.textReq(fileUrl)
+            # fileContent = textReq(fileUrl)
             # Yanıt boş veya yok ise sonrakine geç
             if not fileContent or 'Not found' in fileContent:
                 print('  ... NOT FOUND')
@@ -100,11 +88,11 @@ def updateFiles():
                 f.write(fileContent)
             print('  ... UPDATED')
         except Exception as ex:
-            print('[ERROR]', ex)
-            traceback.print_exc()
+            print('[ERROR]', ex); print_exception(ex)
             continue
-    handlers.lcdClear()
-    handlers.sockClose()
+    if not lcdIsBusy():
+        lcd.clear()
+    sock.close()
     return True
 
 def boot():

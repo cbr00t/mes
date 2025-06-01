@@ -1,15 +1,19 @@
 ### 📁 devBase.py (Ortak Modül)
 from common import *
-from config import server as srv
+from config import local, server as srv, hw
 from time import sleep, monotonic
 import json
-import traceback
+from traceback import print_exception
 
 class BaseEth:
     def __init__(self):
         self.eth = None
     def init(self):
         pass
+    def isConnected(self):
+        return True
+    def getPool(self):
+        return None
 
 class BaseRawSocket:
     def __init__(self):
@@ -17,84 +21,19 @@ class BaseRawSocket:
         self.sock = None
     def isConnected(self):
         return self.sock is not None
+    @classmethod
+    def getDefaultTimeout(self):
+        return srv.socketTimeout
     def open(self):
-        pass
-    def __iptal_read(self, timeout=None):
-        if timeout is None:
-            timeout = 5
-        if not self.isConnected():
-            self.open()
-        sock = self.sock; buffer = b""
-        start_time = monotonic()
-        try:
-            sock.settimeout(0.05)
-            while True:
-                try:
-                    chunk = sock.recv(64)
-                    if not chunk:
-                        break
-                    buffer += chunk
-                    if b"\n" in buffer:
-                        break
-                except Exception:
-                    # Timeout vs. normal hata farkı yapılabilir ama burada kısa beklemeye devam
-                    pass
-                if (monotonic() - start_time) > timeout:
-                    return None
-        except Exception as ex:
-            print("[SocketError]", ex)
-            traceback.print_exception(ex)
-            return None
-
-        # Mesaj tam ise işleme al
-        try:
-            return self._decodeLine(buffer)
-        except Exception as ex:
-            print('[SocketDataError]', ex)
-            traceback.print_exception(ex)
-            return None
-    def read(self, timeout=None):
-        if timeout is None:
-            timeout = 5
-        if not self.isConnected():
-            self.open()
-        sock = self.sock; buffer = b""
-        try:
-            sock.settimeout(0.05)
-            chunk = sock.recv(1)
-            if chunk:
-                busy()
-                buffer += chunk
-                sock.settimeout(timeout)
-                while b"\n" not in buffer:
-                    busy()
-                    chunk = sock.recv(256)
-                    if not chunk: break
-                    buffer += chunk
-        except (TimeoutError, RuntimeError):
-            return None
-        except OSError as ex:
-            errNo = None
-            try: errNo = ex.errno                          # pylocal
-            except AttributeError: errNo = ex.args[0]      # pycircuit
-            if errNo == 116:                               # possible timeout
-                return None
-            print('oserr', errNo)
-            if errNo == 10054:
-                self.close()
-            raise
-        except Exception as ex:
-            print("[SocketError]", ex)
-            traceback.print_exception(ex)
-        try:
-            return self._decodeLine(buffer)
-        except Exception as ex:
-            print('[SocketDataError]', ex)
-            traceback.print_exception(ex)
-            return None
-    def write(self, data):
-        if not self.isConnected(): return False
-        buffer = self._prepareData(data)
+        return not self.isConnected()
+    def close(self):
+        try: self.sock.close()
+        except: pass
+        self.sock = None; print(f'! sock_close')
+        return self
+    def send(self, data):
+        self.open()
+        buffer = self._encodeLine(data)
         sock = self.sock; totalSize = 0
         try:
             while totalSize < len(buffer):
@@ -106,41 +45,119 @@ class BaseRawSocket:
                 totalSize += size
             print(f'> sock_send {totalSize}  Data: {data}')
         except Exception as ex:
-            print("[SocketError]", ex)
+            print("[SendError]", ex)
             self.close()
             return False
-        return True 
-    def close(self):
-        try: self.sock.close()
-        except: pass
-        self.sock = None
-        print(f'! sock_close')
-        return self
+        shared._lastHeartbeatTime = monotonic()
+        return True
+    def recv(self, timeout=None):
+        self.open()
+        sock = self.sock; buffer = b''
+        try:
+            sock.settimeout(0.2); chunk = b''
+            try:
+                chunk = sock.recv(1)
+            except Exception:  # ilk veri gelmezse erken çık
+                if timeout is None:
+                    return None
+            if chunk:
+                busy()
+                buffer += chunk
+            timeout = timeout or self.getDefaultTimeout()
+            start = monotonic(); sock.settimeout(0)
+            while b'\n' not in buffer:
+                busy()
+                # print(timeout, monotonic(), start)
+                if monotonic() - start >= timeout:
+                    return None
+                chunk = sock.recv(1024)
+                buffer += chunk
+        except (RuntimeError, TimeoutError, OSError) as ex:
+            errCode = None
+            try: errCode = ex.errcode
+            except AttributeError: errCode = ex.args[0]
+            if errCode != 10035:
+                print('[RecvError]', ex)
+                print_exception(ex)
+            return None
+        except Exception as ex:
+            print('[RecvException]', ex)
+            print_exception(ex)
+            return None
+        try:
+            result = self._decodeLine(buffer)
+            shared._lastHeartbeatTime = monotonic()
+            return result
+        except Exception as ex:
+            print('[RecvDataError]', ex)
+            print_exception(ex)
+            return None
     def talk(self, data, timeout=None):
-        self.write(data)
-        return self.read(timeout)
-    
-    def _prepareData(self, data):
-        if isinstance(data, dict):
+        self.send(data)
+        return self.recv(timeout or self.getDefaultTimeout())
+    def sendJSON(self, data):
+        return self.send(data)
+    def recvJSON(self, timeout=None):
+        result = self.recv(timeout)
+        if isinstance(result, str):
+            for check in [('{', '}'), ('[', ']')]:
+                if not result.startswith(check[0]) and result.endswith(check[1]):
+                    result = check[0] + result
+                elif result.startswith(check[0]) and not result.endswith(check[1]):
+                    result += check[1]
+        return json.loads(result) if result else None
+    def talkJSON(self, data, timeout=None):
+        result = self.talk(data, timeout)
+        return json.loads(result) if result else None
+    def wsSend(self, api, args = None, data = None, wsPath = None):
+        return self.sendJSON(getWSData(api, args, data, wsPath))
+    def wsRecv(self, timeout=None):
+        return self.recvJSON(timeout)
+    def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
+        return self.talkJSON(getWSData(api, args, data, wsPath), timeout)
+    def wsHeartbeat(self, timeout=None):
+        result = None
+        try:
+            if (shared._lastHeartbeatTime or False) <= 0:                   # no check at startup
+                return True
+            result = self.wsTalk('ping')
+            if not result:
+                raise RuntimeError('recv response')
+            # print('[wsHeartbeat] ', result)
+            return True
+        except Exception as ex:
+            print('[wsHeartbeat]', ex); print_exception(ex)
+            return False
+        finally:
+            if result is None:
+                self.close(); self.open()
+            shared._lastHeartbeatTime = monotonic()
+    def _encodeLine(self, data):
+        # print('data-type', type(data), data)
+        if isinstance(data, (dict, list)):
             data = json.dumps(data)
         if isinstance(data, str):
-            data += "\n"
+            if '\n' not in data: data += '\n'
             return data.encode("utf-8")
         elif isinstance(data, bytes):
-            return data + b"\n"
-        raise TypeError("RawSocket.write(): data must be str, dict or bytes")
+            if b'\n' not in data: data + b'\n'
+            return data
+        raise TypeError('RawSocket._encodeLine(): data must be str, dict or bytes')
     def _decodeLine(self, buffer):
         if not buffer:
             return None
-        line = buffer.split(b'\n', 1)[0]
-        data = line.decode()
-        if data.startswith('\ufeff'):
-            data = data[1:]    # UTF-8 BOM temizle
+        print('    _decodeLine', buffer)
+        utf8Bytes = b'\xef\xef\xbb\xbf'
+        for byte in utf8Bytes:
+            if buffer[0] == byte:
+                buffer = buffer[1:]
+        data = buffer.decode('utf-8').split('\n')[0]
         try:
-            if data: data = data.strip()
-            print(f'< sock_recv {len(data)}  Data: {data}')
+            if data:
+                data = data.strip()
+            print(f'    < sock_recv {len(data)}  Data: {data}')
         except Exception as ex:
-            print(f'< sock_recv {len(data)}  Data: {data}')
+            print(f'    < sock_recv {len(data)}  Data: {data}')
             raise ex
         return data
 
@@ -148,7 +165,7 @@ class BaseWebReq:
     def __init__(self):
         self._initSession()
     def send(self, url, timeout=None):
-        self.send(url, timeout)
+        return None
     def sendText(self, url, timeout=None):
         result = self.send(url, timeout).text
         print(result)
@@ -158,7 +175,7 @@ class BaseWebReq:
         print(result)
         return result
     def _initSession(self):
-        pass
+        return self
 
 class BaseKeypad:
     def __init__(self, onPress = None, onRelease = None):
@@ -173,13 +190,23 @@ class BaseKeypad:
         return self
 
 class BaseLCD:
+    def write(self, data, row=0, col=0):
+        shared._lastLCDTime = monotonic()
+        return self
+    def clearLine(self, row):
+        print(f'[LCD] clearLine: row={row}')
+        if isinstance(row, (list, range)):
+            for _row in row:
+                self.clearLine(_row)
+            return self
+        self.write(' ' * hw.lcd.cols, row, 0)
+        shared._lastLCDTime = None
+        return self
     def clear(self):
         return self
-    def write(self, data, row=0, col=0):
+    def on(self):
         return self
-    def on():
-        return self
-    def off():
+    def off(self):
         return self
 
 class BaseLED:

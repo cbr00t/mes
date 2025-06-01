@@ -1,16 +1,16 @@
 # ---------- dev_local.py ----------
+from common import *
+from config import server as srv
+from devBase import *
 from time import sleep
 import json
 import socket
 import requests
-from common import *
-from config import local, server as srv
-import core
-from devBase import *
 
 # ---------- Ethernet Class (Mock) ----------
 class Eth(BaseEth):
     def __init__(self):
+        from config import local
         super().__init__()
         eth = self.eth = self
         eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
@@ -33,7 +33,8 @@ class WebReq(BaseWebReq):
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
     def open(self):
-        super().open()
+        if not super().open():
+            return self
         srv = self.server
         sock = self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ep = (ip2Str(srv.ip), srv.rawPort)
@@ -68,11 +69,11 @@ class LCDCtl(BaseLCD):
         super().write(data, row, col)
         print(f"[LCD] write @({row},{col}):", data)
         return self
-    def on():
+    def on(self):
         super().on()
         print("[LCD] on")
         return self
-    def off():
+    def off(self):
         super().off()
         print("[LCD] off")
         return self
@@ -91,15 +92,18 @@ class RFIDCtl(BaseRFID):
 
 
 # ---------- Device Initialization ----------
-updateCheck = False
-dev = core.dev = core.Device()
+shared.updateCheck = False                                   # if config.autoUpdate is None
+dev = shared.dev = Device()
 def setup_eth(): dev.eth = Eth().init()
-def setup_req(): dev.req = WebReq()
+def setup_req(): dev.req = WebReq();
 def setup_sock(): dev.sock = RawSocket()
 def setup_keypad(): dev.keypad = Keypad()
 def setup_lcd(): dev.lcd = LCDCtl()
 def setup_led(): dev.led = LEDCtl()
 def setup_rfid(): dev.rfid = RFIDCtl()
-steps = [setup_eth, setup_req, setup_sock, setup_keypad, setup_lcd, setup_led, setup_rfid]
+steps = [
+    setup_eth, setup_req, setup_sock, setup_keypad,
+    setup_lcd, setup_led, setup_rfid
+]
 for step in steps:
     step()

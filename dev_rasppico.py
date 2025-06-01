@@ -1,10 +1,9 @@
 # ---------- dev_rasppico.py (Güncellenmiş) ----------
 from common import *
-import core
 from config import local, server as srv, hw
 from devBase import *
 from time import sleep, monotonic
-import traceback
+from traceback import print_exception
 
 try:
     import board
@@ -24,24 +23,28 @@ except (Exception):
 class Eth(BaseEth):
     def __init__(self):
         super().__init__()
-        self._spi = self._cs = None
+        self.pool = self._spi = self._cs = self._reset = None
     def init(self):
         is_dhcp = not local.ip
-        spi = self._spi; cs = self._cs; eth = self.eth
-        if spi is not None: spi.deinit(); spi = None
-        if cs is None:
-            cs = self._cs = digitalio.DigitalInOut(board.GP17) if 'digitalio' in globals() else None
-        if spi is None:
-            spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16) if 'busio' in globals() else None
-        eth = self.eth = WIZNET5K(spi, cs, is_dhcp=is_dhcp) if 'WIZNET5K' in globals() else self
+        spi = self._spi; cs = self._cs;
+        reset = self._reset; eth = self.eth
+        # if spi is not None: spi.deinit(); spi = None
+        if cs is None: cs = self._cs = digitalio.DigitalInOut(board.GP17) if 'digitalio' in globals() else None
+        if spi is None: spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16) if 'busio' in globals() else None
+        if reset is None: reset = self._reset = digitalio.DigitalInOut(board.GP20)
+        eth = self.eth = WIZNET5K(spi, cs, reset, is_dhcp=is_dhcp) if 'WIZNET5K' in globals() else self
         if not is_dhcp: eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
-        try:
-            while not eth.link_status:
-                print("eth init...")
-                sleep(0.5)
-        except AttributeError:
-            pass
         return self
+    def isConnected(self):
+        return self.eth.link_status
+    def getPool(self):
+        pool = self.pool
+        if pool is not None:
+            return pool
+        if not ('adafruit_connection_manager' in globals() and self.isConnected()):
+            return None
+        pool = self.pool = adafruit_connection_manager.get_radio_socketpool(self.eth)
+        return pool
 
 # ---------- Web Requests Class ----------
 class WebReq(BaseWebReq):
@@ -54,17 +57,17 @@ class WebReq(BaseWebReq):
         print(f'... result: [{result}]')
         return result
     def _initSession(self):
-        # global pool
-        self.session = adafruit_requests.Session(pool, None) if 'adafruit_requests' in globals() else None
+        eth = shared.dev.eth
+        self.session = adafruit_requests.Session(eth.getPool(), None) if 'adafruit_requests' in globals() else None
 
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
-    def __init__(self):
-        super().__init__()
-        self._pool = None
     def open(self):
-        super().open(); global pool
-        sock = self.sock = pool.socket()
+        if not super().open():
+            return self
+        eth = shared.dev.eth
+        pool = eth.getPool()
+        sock = self.sock = pool.socket(pool.AF_INET, pool.SOCK_STREAM)
         srv = self.server; ep = (ip2Str(srv.ip), srv.rawPort)
         try:
             sock.connect(ep)
@@ -122,6 +125,7 @@ class Keypad(BaseKeypad):
         except Exception as ex:
             # Herhangi bir hata olursa sessizce devam et
             print(f"Keypad tarama hatası: {ex}")
+            print_exception(ex)
         return self
 
 # ---------- LCD Control Class ----------
@@ -133,26 +137,22 @@ class LCDCtl(BaseLCD):
         lcdCfg = hw.lcd
         lcd = self.lcd = LCD(interface, num_rows=lcdCfg.rows, num_cols=lcdCfg.cols) if 'LCD' in globals() else None
         if lcd is not None:
-            lcd.set_backlight(True)
-            lcd.clear()
+            self.off(); self.clear()
     def clear(self):
         super().clear()
-        self.lcd.clear()
-        print('lcdClear')
+        self.lcd.clear(); print('lcdClear')
         return self
     def write(self, data, row=0, col=0):
         super().write(data, row, col)
-        lcd = self.lcd
-        lcd.set_cursor_pos(row, col)
-        lcd.print(data)
-        print('lcdWrite', data)
+        lcd = self.lcd; lcd.set_cursor_pos(row, col)
+        lcd.print(data); print('lcdWrite', data)
         # if not data.strip():
         #     raise RuntimeError()
         return self
-    def on():
+    def on(self):
         self.lcd.set_backlight(True)
         return self
-    def off():
+    def off(self):
         self.lcd.set_backlight(False)
         return self
 
@@ -164,18 +164,18 @@ class RFIDCtl(BaseRFID):
 
 
 # ---------- Device Initialization ----------
-dev = core.dev = core.Device()
-updateCheck = True
-def setup_eth():
-    global pool
-    eth = dev.eth = Eth().init(); _eth = eth.eth 
-    pool = adafruit_connection_manager.get_radio_socketpool(_eth) if 'adafruit_connection_manager' in globals() else None
+shared.updateCheck = True                                    # if config.autoUpdate is None
+dev = shared.dev = Device()
+def setup_eth(): dev.eth = Eth().init()
 def setup_req(): dev.req = WebReq()
 def setup_sock(): dev.sock = RawSocket()
 def setup_keypad(): dev.keypad = Keypad()
 def setup_lcd(): dev.lcd = LCDCtl()
 def setup_led(): dev.led = LEDCtl()
 def setup_rfid(): dev.rfid = RFIDCtl()
-steps = [setup_eth, setup_req, setup_sock, setup_keypad, setup_lcd, setup_led, setup_rfid]
+steps = [
+    setup_eth, setup_req, setup_sock, setup_keypad,
+    setup_lcd, setup_led, setup_rfid
+]
 for step in steps:
     step()
