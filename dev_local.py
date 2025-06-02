@@ -44,7 +44,7 @@ class RawSocket(BaseRawSocket):
         except Exception:
             sock = self.sock = None
             raise
-        return self
+        return self.isConnected()
 
 # ---------- Keypad Class (Mock) ----------
 class Keypad(BaseKeypad):
@@ -65,7 +65,7 @@ class LCDCtl(BaseLCD):
         super().clear()
         print("[LCD] cleared.")
         return self
-    def write(self, data, row=0, col=0):
+    def write(self, data, row=0, col=0, _internal=False):
         super().write(data, row, col)
         print(f"[LCD] write @({row},{col}):", data)
         return self

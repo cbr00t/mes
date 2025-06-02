@@ -75,7 +75,7 @@ class RawSocket(BaseRawSocket):
         except Exception:
             sock = self.sock = None
             raise
-        return self
+        return self.isConnected()
 
 # ---------- Keypad Control Class ----------
 class Keypad(BaseKeypad):
@@ -111,6 +111,7 @@ class Keypad(BaseKeypad):
                 if key not in self._pressed:
                     self._pressed[key] = now
                     if self.onPress:
+                        self._lastKeyPressTime = monotonic()
                         self.onPress(key)
             
             # Bırakılan tuşları kontrol et
@@ -121,6 +122,7 @@ class Keypad(BaseKeypad):
                 # Tüm tuş bırakma olaylarını işle
                 if self.onRelease:
                     # 3 ondalık basamak hassasiyet (milisaniye)
+                    self._lastKeyReleaseTime = monotonic()
                     self.onRelease(key, duration)
         except Exception as ex:
             # Herhangi bir hata olursa sessizce devam et
@@ -142,7 +144,7 @@ class LCDCtl(BaseLCD):
         super().clear()
         self.lcd.clear(); print('lcdClear')
         return self
-    def write(self, data, row=0, col=0):
+    def write(self, data, row=0, col=0, _internal=False):
         super().write(data, row, col)
         lcd = self.lcd; lcd.set_cursor_pos(row, col)
         lcd.print(data); print('lcdWrite', data)

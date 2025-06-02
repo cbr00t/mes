@@ -67,11 +67,9 @@ class AppHandlers:
     def jsonReq(self, data, timeout=None):
         return self.dev.req.sendJSON(data, timeout)
     def lcdWrite(self, text, row=0, col=0):
-        shared._lastLCDTime = monotonic()
         self.dev.lcd.write(text, row, col)
         return self
     def lcdClearLine(self, row):
-        shared._lastLCDTime = None
         lcd = self.dev.lcd
         if isinstance(row, (list, range)):
             for _row in row:
@@ -84,7 +82,6 @@ class AppHandlers:
         return self
     def ledWrite(self, rgb, col=0):
         self.dev.led.write(rgb, col)
-        shared._lastLEDTime = monotonic()
         return self
     def ledClear(self):
         self.dev.led.clear()
@@ -110,18 +107,11 @@ class AppHandlers:
     
     ## Event Handlers
     def keypad_onPressed(self, key):
-        shared._lastKeypadTime = monotonic()
         print(f'key_press: [{key}]')
+        handler = shared._onKeyPressed
+        if handler is not None: handler(key)
     def keypad_onReleased(self, key, duration):
         print(f'key_release: [{key}:{duration}]')
-        key = key.lower()
-        _id = 'primary' if key == '0' or key == 'enter' else key
-        lastTime = shared._lastKeypadTime
-        delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
-        busy(); self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'TUS GONDER: [{key}]...', 2, 1)
-        self.wsSend('fnIslemi', { 'id': _id, 'delayMS': delayMS })
-        result = self.wsRecv(0)
-        self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'* [{key}] GITTI', 2, 0)
-        return None
-
+        handler = shared._onKeyReleased
+        if handler is not None: handler(key)
 

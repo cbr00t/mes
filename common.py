@@ -29,7 +29,11 @@ class NS:
 class Shared(NS):
     @classmethod
     def getInstVars(cls):
-        return super().getInstVars() + ['dev', 'updateCheck', '_lastBusyTime', '_lastLCDTime', '_lastLEDTime']
+        return super().getInstVars() + ['dev']
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.updateCheck = True
+        self.lastTime = NS()
 
 # Functions
 def tuple2Str(value, delim):
@@ -84,17 +88,202 @@ def exists(fname):
 # ----------------------------------------------------------------------------- #
 
 
+# Global Vars
+if not 'shared' in globals():
+    shared = Shared()
+
+
 # Class Defs
 class Device(NS):
     @classmethod
     def getInstVars(cls):
         return super().getInstVars() + ['eth', 'req', 'sock', 'keypad', 'lcd', 'led', 'rfid']
 
-# Global Vars
-if not 'shared' in globals():
-    shared = Shared(
-        updateCheck = True                                          # Auto Update enabled by default (if config.server.autoUpdate is None)
-    )
+class Part(NS):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        size = self.stdout().getRowCols()
+        self._inMaxLen = (size.cols - 2)
+        self._bufferIn = self._bufferIn or ''
+        self._bufferOut = self.stdout()._buffer                                                                  # stdout - buffer ref
+        inputs = self._inputs = self._inputs or {}
+        curInputInd = self.__curInputInd = self.__curInputInd or 0
+    @staticmethod
+    def stack():
+        s = getattr(Part, '_stack', None)
+        if s is None:
+            s = Part._stack = []
+        return s
+    @staticmethod
+    def current():
+        item = Part._stackPeek()
+        return item.part if item else None
+    @classmethod
+    def partName(cls):
+        return cls.__name__
+    @classmethod
+    def title():
+        return ''
+    def editable(self):
+        return False
+    def _curInputInd(self, ind = None):
+        inputs = self._inputs; count = len(inputs)
+        # get
+        if ind is None:
+            curInd = self.__curInputInd
+            return curInd if inputs and 0 <= curInd < count else None
+        # set
+        if inputs and 0 <= ind < count:
+            self.__curInputInd = ind
+        return self
+    def _curInputName(self, name = None):
+        inputs = self._inputs; curInd = self._curInputInd
+        if not inputs: return None
+        # get
+        if not name:
+            return None if curInd is None else inputs.keys()[curInd]
+        # set
+        curInd = inputs.keys().index(name)
+        if curInd is not None:
+            self._curInputInd = curInd
+        return self
+    @classmethod
+    def Run(cls, *args, **kwargs):
+        inst = cls()
+        inst.run(*args, **kwargs)
+        return inst
+    def run(self):
+        self.open()
+    def open(self):
+        Part._stackPush(self)
+        Part._currentChanged(False)
+        return self
+    @staticmethod
+    def closeLast():
+        item = Part._stackPop()
+        if item is None: return None
+        Part._currentChanged(True)
+        return item.part
+    @staticmethod
+    def closeAll():
+        if not Part._stackClear(): return False
+        Part._currentChanged(True)
+        return True
+    @staticmethod
+    def _currentChanged(revert):
+        current = Part.current(revert)
+        if current:
+            current._toggleSnapshot(revert)
+            current.render()
+        else:
+            Part.stdout().clear()
+    def canClose(self):
+        return True
+    # close 'last' part
+    def close(self):
+        if not self.canClose():
+            return False
+        Part.closeLast()
+        return True
+    def render(self):
+        out = self.stdout()
+        out.clear()
+        out.write(self.title() or '', 0, 1)
+        # ...
+        # ...
+    def validateInput(self, data):
+        return True
+    def processInput(self, data):
+        # e.g for IPInputPart:
+        #    if len(data) >= 3: self._selectNextInput()
+        return True
+    def onKeyPressed(self, key):
+        return False                                                                                                # by default, keyPress NOT handled by part
+    def onKeyReleased(self, key, delayMS = None):
+        if not self.editable: return False
+        _key = key.lower(); buf = self._bufferIn
+        if _key == 'enter':
+            self._commitInput(buf)
+        elif _key == 'esc':
+            if buf: buf = self._bufferIn = buf[:-1]
+        elif _key == 'f1':
+            if self.close():
+                return True                                                                                         # by default, keyRelease handled by part
+        elif _key == '^':
+            self._selectPrevInput()
+        elif _key == 'v':
+            self._selectNextInput()
+        else:
+            limit = self._inMaxLen
+            if limit is None or len(buf) < limit:
+                buf += key
+                self._commitInput(buf)
+        self.render()                                                                                               # Render LCD GUI for each keystroke
+        return True                                                                                                 # key handled by part
+    def _commitInput(self, data):
+        if not editable(): return False
+        if not (self.validateInput(data)): return False
+        result = self.processInput(self, data)
+        buf = self._bufferIn = ''
+        return result
+    def _selectFirstInput(self):
+        return self._selectInput('_first')
+    def _selectLastInput(self):
+        return self._selectInput('_last')
+    def _selectNextInput(self):
+        return self._selectInput('_next')
+    def _selectPrevInput(self):
+        return self._selectInput('_prev')
+    def _selectInput(nameOrDirectionOrIndex):
+        if not nameOrDirectionOrIndex:
+            return self
+        name = nameOrDirectionOrIndex; old = self._curInputInd()
+        new = old if isinstance(name, int) else \
+              0 if name == '_first' else \
+              len(self.inputs)[-1] if name == '_last' else \
+              old + 1 if name == '_next' else \
+              old - 1 if name == '_prev' else \
+              self.inputs.index(name)
+        if new is not None:
+            self._curInputInd(new)
+    def _toggleSnapshot(self, revert=False):
+        out = self.stdout(); cur = Part.current()
+        if revert:
+            buf = self._bufferOut
+            for rowIndex, row in enumerate(buf):
+                line = ''.join(row)
+                lcd.write(line, rowIndex, 0, _internal=True)                                                         # internal → zaman güncelleme vs olmasın
+        self._bufferOut = out._buffer if cur == self else out._readMatrix()                                          # current == self ise lcd buffer referansı , aksinde readMatrix ile buffer kopyası
+    def out_write(self, data, row=0, col=0):
+        self.stdout().write(data, row, col)
+    def out_clear(self):
+        self.stdout().clear()
+    def out_clearLine(self, row):
+        self.stdout().clearLine(row)
+    @classmethod
+    def stdin():
+        return shared.dev.keypad  # ??
+    @classmethod
+    def stdout():
+        return shared.dev.lcd
+    @staticmethod
+    def _stackPush(part):
+        s = Part.stack()
+        s.append(NS(part = part))
+        return part
+    @staticmethod
+    def _stackPop():
+        s = Part.stack()
+        return s.pop() if s else None
+    @staticmethod
+    def _stackPeek():
+        s = Part.stack()
+        return s[-1] if s else None
+    @staticmethod
+    def _stackClear():
+        s = Part.stack()
+        if not s: return False
+        s.clear(); return True
 
 # User Functions
 def getUpdateUrls():
@@ -120,34 +309,30 @@ def getWSUrl(qs = None, wsPath = None, api = None, https = None):
             if value: result += f'={value}'
     return result.rstrip('&')
 def getHeartbeatInterval():
-    if isBusy():
-        return None
+    if isBusy(): return None
     from config import server as srv
     hearbeatInterval = srv.hearbeatInterval
-    if (hearbeatInterval or 0) <= 0:
-        return None
-    if isIdle():
-        return hearbeatInterval * 3
+    if (hearbeatInterval or 0) <= 0: return None
+    if isIdle(): return hearbeatInterval * 3
     return hearbeatInterval
 
 def isIdle():
     from config import local
     idleTime = local.idleTime
-    if (idleTime or 0) <= 0:
-        return False
-    return shared._lastBusyTime and monotonic() - shared._lastBusyTime > idleTime
+    if (idleTime or 0) <= 0: return False
+    return shared.lastTime._busy and monotonic() - shared.lastTime._busy > idleTime
 def isBusy():
-    return shared._lastBusyTime and monotonic() - shared._lastBusyTime <= 0.5
+    return shared.lastTime._busy and monotonic() - shared.lastTime._busy <= 0.3
 def busy():
-    shared._lastBusyTime = monotonic()
+    shared.lastTime._busy = monotonic()
 def lcdIsBusy():
-    return shared.activePart is not None
+    return Part.current() is not None
 def lcdCanBeCleared():
-    isBusy = lcdIsBusy(); lastTime = shared._lastLCDTime
+    isBusy = lcdIsBusy(); lastTime = shared.lastTime._lcd
     return not isBusy and lastTime and (monotonic() - lastTime) >= 3
 def heartbeatShouldBeChecked():
     if isBusy(): return False 
-    hearbeatInterval = getHeartbeatInterval(); lastTime = shared._lastHeartbeatTime or 0
+    hearbeatInterval = getHeartbeatInterval(); lastTime = shared.lastTime._heartbeat or 0
     return hearbeatInterval and monotonic() - lastTime > hearbeatInterval
 def getWSData(api, args = None, data = None, wsPath = None):
     from config import server as srv
@@ -159,21 +344,3 @@ def getWSData(api, args = None, data = None, wsPath = None):
     # print('getwsdata', result)
     return result
 
-# Initialization
-def globalInit():
-    initDevice()
-    initHandlers()
-def initDevice():
-    from config import mod
-    dev = shared.dev
-    if dev is not None:
-        return dev
-    modName_device = mod.device or ('rasppico' if isCircuitPy() else 'local')
-    print(f'Device Module = {modName_device}')
-    dynImport(f'dev_{modName_device}', 'mod_dev')
-    dev = shared.dev; print(dev)
-    return dev
-def initHandlers():
-    from appHandlers import AppHandlers
-    handlers = shared.handlers = AppHandlers()
-    return handlers

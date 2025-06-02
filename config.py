@@ -97,7 +97,7 @@ else:
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 0, 8)
+    version                         = (1, 0, 0, 9)
 )
 
 

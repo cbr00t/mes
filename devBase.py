@@ -27,9 +27,10 @@ class BaseRawSocket:
     def open(self):
         return not self.isConnected()
     def close(self):
-        try: self.sock.close()
-        except: pass
-        self.sock = None; print(f'! sock_close')
+        if self.isConnected():
+            try: self.sock.close()
+            except: pass
+            self.sock = None; print(f'! sock_close')
         return self
     def send(self, data):
         self.open()
@@ -48,7 +49,7 @@ class BaseRawSocket:
             print("[SendError]", ex)
             self.close()
             return False
-        shared._lastHeartbeatTime = monotonic()
+        shared.lastTime.heartbeat = monotonic()
         return True
     def recv(self, timeout=None):
         self.open()
@@ -86,7 +87,7 @@ class BaseRawSocket:
             return None
         try:
             result = self._decodeLine(buffer)
-            shared._lastHeartbeatTime = monotonic()
+            shared.lastTime.heartbeat = monotonic()
             return result
         except Exception as ex:
             print('[RecvDataError]', ex)
@@ -118,7 +119,7 @@ class BaseRawSocket:
     def wsHeartbeat(self, timeout=None):
         result = None
         try:
-            if (shared._lastHeartbeatTime or False) <= 0:                   # no check at startup
+            if (shared.lastTime.heartbeat or 0) <= 0:                   # no check at startup
                 return True
             result = self.wsTalk('ping')
             if not result:
@@ -131,7 +132,9 @@ class BaseRawSocket:
         finally:
             if result is None:
                 self.close(); self.open()
-            shared._lastHeartbeatTime = monotonic()
+            shared.lastTime.heartbeat = monotonic()
+    def wsHeartbeatIfNeed(self, timeout=None):
+        return self.wsHeartbeat(timeout) if heartbeatShouldBeChecked() else True
     def _encodeLine(self, data):
         # print('data-type', type(data), data)
         if isinstance(data, (dict, list)):
@@ -179,6 +182,7 @@ class BaseWebReq:
 
 class BaseKeypad:
     def __init__(self, onPress = None, onRelease = None):
+        self._lastKeyPressTime = self._lastKeyReleaseTime = None
         pass
     def update(self):
         return self
@@ -190,8 +194,38 @@ class BaseKeypad:
         return self
 
 class BaseLCD:
-    def write(self, data, row=0, col=0):
-        shared._lastLCDTime = monotonic()
+    @classmethod
+    def __init__(self):
+        self._lastWriteTime = None
+        size = self.getRowCols()
+        self._buffer = [['' for _ in range(size.cols)] for _ in range(size.rows)]          # lcd matrix data buffer
+    @classmethod
+    def getRowCols(cls):
+        cfg = hw.lcd
+        return NS(rows = cfg.rows, cols = cfg.cols)
+    @classmethod
+    def getRows(cls):
+        return self.getRowCols().rows
+    @classmethod
+    def getCols(cls):
+        return self.getRowCols().cols
+    def _read(self, asString=False):
+        buf = self._buffer
+        return [''.join(row) for row in buf] if asString else buf
+    def readMatrix(self):
+        return [row[:] for row in self._buffer]
+    def readBuffer(self):
+        return self._read(False)
+    def readLines(self):
+        return '\n'.join(self.readLines())
+    def readString(self):
+        return self.readLines().join('\n')
+    def write(self, data, row=0, col=0, _internal=False):
+        if not _internal: self._lastWriteTime = monotonic()
+        buf = self._buffer
+        for i, ch in enumerate(data):
+            if col + i < len(buf[row]):
+                buf[row][col + i] = ch
         return self
     def clearLine(self, row):
         print(f'[LCD] clearLine: row={row}')
@@ -199,11 +233,22 @@ class BaseLCD:
             for _row in row:
                 self.clearLine(_row)
             return self
-        self.write(' ' * hw.lcd.cols, row, 0)
-        shared._lastLCDTime = None
+        self.write(' ' * hw.lcd.cols, row, 0, True)
+        self._lastWriteTime = None
         return self
     def clear(self):
+        self._lastWriteTime = None
+        self._buffer = [['' for _ in range(len(row))] for row in self._buffer]
         return self
+    def writeIfReady(self, data, row=0, col=0,  _internal=False):
+        if not lcdIsBusy():
+            return self.write(data, row, col, _internal)
+    def clearLineIfReady(self, row):
+        if not lcdIsBusy():
+            return self.clearLine(row)
+    def clearIfReady(self):
+        if not lcdIsBusy():
+            return self.clear()
     def on(self):
         return self
     def off(self):

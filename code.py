@@ -1,2 +1,2 @@
-import bootldr
-bootldr.run()
+import app
+app.init(); app.run()
