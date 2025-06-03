@@ -30,8 +30,7 @@ class Part(NS):
         if value is None:
             return self._title or ''
         # Setter
-        changed = self._title != value; self._title = value
-        if changed: self.onAttrChanged()
+        self._title = value; self.onAttrChanged()
         return self
     def editable(self):
         return False
