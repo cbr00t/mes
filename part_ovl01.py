@@ -20,12 +20,19 @@ class Part(NS):
     def current():
         item = Part._stackPeek()
         return item.part if item else None
+    def active(self):
+        return self == Part.current()
     @classmethod
     def partName(cls):
         return cls.__name__
-    @classmethod
-    def title(cls):
-        return ''
+    def title(self, value=None):
+        # Getter
+        if value is None:
+            return self._title or ''
+        # Setter
+        changed = self._title != value; self._title = value
+        if changed: self.onAttrChanged()
+        return self
     def editable(self):
         return False
     def curInputInd(self, ind=None):
@@ -52,8 +59,8 @@ class Part(NS):
         return self
     @classmethod
     def Run(cls, *args, **kwargs):
-        inst = cls()
-        inst.run(*args, **kwargs)
+        inst = cls(*args, **kwargs)
+        inst.run()
         return inst
     def run(self):
         self.open()
@@ -93,6 +100,7 @@ class Part(NS):
         out.write(self.title() or '', 0, 1)
         # ...
         # ...
+        self._rendered = True
     def validateInput(self, data):
         return True
     def processInput(self, data):
@@ -120,6 +128,10 @@ class Part(NS):
         return result                                                                                              # key handled by part or Internal result
     def onKeyPressed_araIslem(self, key, delayMS = None):
         return None
+    def onAttrChanged(self, defer = False):
+        self._rendered = False
+        if not defer and self.active(): self.render()
+        return self
     def selectFirstInput(self):
         return self.selectInput('_first')
     def selectLastInput(self):
@@ -140,15 +152,18 @@ class Part(NS):
               self.inputs.index(name)
         if new is not None:
             self.curInputInd(new)
+        return self
     def _toggleSnapshot(self, revert=False):
         out = self.stdout(); cur = Part.current()
         if revert:
             buf = self._bufferOut
             for rowIndex, row in enumerate(buf):
                 line = ''.join(row)
-                lcd.write(line, rowIndex, 0, _internal=True)                                                         # internal → zaman güncelleme vs olmasın
-        self._bufferOut = out._buffer if cur == self else out._readMatrix()                                          # current == self ise lcd buffer referansı , aksinde readMatrix ile buffer kopyası
-    def out_write(self, data, row=0, col=0):
+                self.out_write(line, rowIndex, 0, _internal=True)                                                  # internal → zaman güncelleme vs olmasın
+        self._bufferOut = out._buffer if cur == self else out._readMatrix()                                        # current == self ise lcd buffer referansı , aksinde readMatrix ile buffer kopyası
+        self._rendered = False
+        return self
+    def out_write(self, data, row=0, col=0, _internal=False):
         self.stdout().write(data, row, col)
     def out_clear(self):
         self.stdout().clear()
