@@ -25,15 +25,18 @@ class BaseRawSocket:
     def getDefaultTimeout(self):
         return srv.socketTimeout
     def open(self):
+        if not self.isConnected():
+            busy(); srv = self.server
+            print('connect to:', f'{ip2Str(srv.ip)}:{srv.rawPort}')
         return not self.isConnected()
     def close(self):
         if self.isConnected():
-            try: self.sock.close()
+            try: busy(); self.sock.close()
             except: pass
             self.sock = None; print(f'! sock_close')
         return self
     def send(self, data):
-        self.open()
+        if not self.isConnected(): return False
         buffer = self._encodeLine(data)
         sock = self.sock; totalSize = 0
         try:
@@ -52,32 +55,30 @@ class BaseRawSocket:
         shared.lastTime.heartbeat = monotonic()
         return True
     def recv(self, timeout=None):
-        self.open()
+        if not self.isConnected(): return None
         sock = self.sock; buffer = b''
         try:
-            sock.settimeout(0.2); chunk = b''
+            sock.settimeout(0.05); chunk = b''
             try:
                 chunk = sock.recv(1)
             except Exception:  # ilk veri gelmezse erken çık
-                if timeout is None:
-                    return None
-            if chunk:
-                busy()
-                buffer += chunk
+                if timeout is None: return None
+            if chunk: buffer += chunk
             timeout = timeout or self.getDefaultTimeout()
-            start = monotonic(); sock.settimeout(0)
+            sock.settimeout(0); start = monotonic()
             while b'\n' not in buffer:
-                busy()
-                # print(timeout, monotonic(), start)
-                if monotonic() - start >= timeout:
-                    return None
                 chunk = sock.recv(1024)
-                buffer += chunk
+                if chunk: buffer += chunk
+                # print(timeout, monotonic(), start)
+                if monotonic() - start >= timeout: return None
+            busy()
         except (RuntimeError, TimeoutError, OSError) as ex:
             errCode = None
             try: errCode = ex.errcode
             except AttributeError: errCode = ex.args[0]
-            if errCode != 10035:
+            # if errCode == 10054:
+            #    self.close()
+            if not (isinstance(ex, TimeoutError) or errCode == 116 or errCode == 10035):
                 print('[RecvError]', ex)
                 print_exception(ex)
             return None
@@ -119,11 +120,8 @@ class BaseRawSocket:
     def wsHeartbeat(self, timeout=None):
         result = None
         try:
-            if (shared.lastTime.heartbeat or 0) <= 0:                   # no check at startup
-                return True
             result = self.wsTalk('ping')
-            if not result:
-                raise RuntimeError('recv response')
+            if not result: raise RuntimeError('recv response')
             # print('[wsHeartbeat] ', result)
             return True
         except Exception as ex:
@@ -131,7 +129,7 @@ class BaseRawSocket:
             return False
         finally:
             if result is None:
-                self.close(); self.open()
+                self.close()
             shared.lastTime.heartbeat = monotonic()
     def wsHeartbeatIfNeed(self, timeout=None):
         return self.wsHeartbeat(timeout) if heartbeatShouldBeChecked() else True
@@ -198,7 +196,7 @@ class BaseLCD:
     def __init__(self):
         self._lastWriteTime = None
         size = self.getRowCols()
-        self._buffer = [['' for _ in range(size.cols)] for _ in range(size.rows)]          # lcd matrix data buffer
+        self._buffer = [['' for _ in range(size.cols + 1)] for _ in range(size.rows + 1)]          # lcd matrix data buffer
     @classmethod
     def getRowCols(cls):
         cfg = hw.lcd
@@ -229,6 +227,8 @@ class BaseLCD:
         return self
     def clearLine(self, row):
         print(f'[LCD] clearLine: row={row}')
+        if isinstance(row, range):
+            row = range(row.start, row.stop + 1)
         if isinstance(row, (list, range)):
             for _row in row:
                 self.clearLine(_row)
@@ -244,10 +244,10 @@ class BaseLCD:
         if not lcdIsBusy():
             return self.write(data, row, col, _internal)
     def clearLineIfReady(self, row):
-        if not lcdIsBusy():
+        if lcdCanBeCleared():
             return self.clearLine(row)
     def clearIfReady(self):
-        if not lcdIsBusy():
+        if lcdCanBeCleared():
             return self.clear()
     def on(self):
         return self

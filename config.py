@@ -10,7 +10,7 @@ from common import *
 local = NS(
     subnet                          =  (255, 255, 255, 0),
     dns                             =  (1, 1, 1, 1),
-    idleTime                        =  60
+    idleTime                        =  500
 )
 
 ## Ana Makine (Server) Ayarları
@@ -47,8 +47,8 @@ hw = NS(
         ]
     ),
     lcd = NS(
-        rows = 4,
-        cols = 20
+        rows = 4, cols = 20,
+        clearDelay = 2
     )
 )
 
@@ -97,7 +97,7 @@ else:
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 0, 9)
+    version                         = (1, 0, 0, 10)
 )
 
 

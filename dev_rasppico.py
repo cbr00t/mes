@@ -71,9 +71,10 @@ class RawSocket(BaseRawSocket):
         srv = self.server; ep = (ip2Str(srv.ip), srv.rawPort)
         try:
             sock.connect(ep)
-            print(f'! sock_open', f'{ep[0]}:{ep[1]}')
-        except Exception:
+            print('! sock_open', f'{ep[0]}:{ep[1]}')
+        except Exception as ex:
             sock = self.sock = None
+            print('! [ERROR]', 'sock_open', ex)
             raise
         return self.isConnected()
 

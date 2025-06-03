@@ -1,5 +1,6 @@
 from common import *
 from config import app, local, server as srv, hw
+from part import *
 from time import sleep, monotonic
 import json
 import gc
@@ -12,6 +13,7 @@ def init():
     dev = initDevice(); h = initHandlers()
     eth = dev.eth; lcd = dev.lcd; sock = dev.sock; keypad = dev.keypad
     shared._onKeyPressed = onKeyPressed; shared._onKeyReleased = onKeyReleased
+
 def run():
     lcd.off(); lcd.on()
     lcd.clearIfReady(); sock.close()
@@ -22,24 +24,26 @@ def run():
         except Exception as ex:
             print('[ERROR]', 'APP LOOP:', ex)
             print_exception(ex)
+    lcd.clear(); lcd.write('SHUTDOWN', 1,1)
     sock.close()
+
+
 def loop():
     global cpuHaltTime
-    cpuHaltTime = 0.3 if isIdle() else 0.01; sleep(cpuHaltTime)
+    cpuHaltTime = 0.2 if isIdle() else 0.01; sleep(cpuHaltTime)
     if not shared._appTitleRendered: renderAppTitle()
     if lcd._lastWriteTime: lcd.clearLineIfReady(2)
-    gc.collect()
+    # gc.collect()
+    keypad.update()
+    sock.wsHeartbeatIfNeed()
     if connectToServerIfNot():
-        if not shared._updateCheckPerformed: updateFiles()
-        actionsCheckAndExec()
-        sock.wsHeartbeatIfNeed()
+        if not shared._updateCheckPerformed:
+            updateFiles()
+            lcd.clearIfReady(); renderAppTitle()
+    actionsCheckAndExec()
     keypad.update()
 
-def test():
-    h.wsTalk('fnIslemi', { 'id': 2, 'ip': local.ip })
-    h.sockClose()
 
-# Initialization
 def initDevice():
     print('    init device')
     dev = shared.dev
@@ -68,27 +72,112 @@ def ethWait():
 def connectToServerIfNot():
     if sock.isConnected(): return True
     if not ethCheck(): return False
-    lcd.clearLine(range(1, 3))
-    lcd.writeIfReady('SUNUCUYA BAGLAN:', 1, 0)
-    lcd.writeIfReady(f'{srvIP}:{srvPort}', 2, 1)
-    print(f'connect to: [{srvIP}:{srvPort}]')
+    shared._inActionsCheck = False
+    if not lcdIsBusy():
+        lcd.clearLine(range(1, 3))
+        lcd.write('SUNUCUYA BAGLAN:', 1, 0)
+        lcd.write(f'{srvIP}:{srvPort}', 2, 1)
     try:
-        if sock.open():
-            lcd.clearLineIfReady(range(1, 3))
-            lcd.writeIfReady('KOMUT BEKLENIYOR', 1, 2)
-            print('awaiting remote command')
-            return True
+        return sock.open()
     except Exception as ex:
-        connected = False
         print('[ERROR]', ex); print_exception(ex)
         return False
+    finally:
+        if not lcdIsBusy():
+            lcd.clearLine(range(1, 3))
 def renderAppTitle():
     lcd.clearLineIfReady(0)
     lcd.writeIfReady(f'{app.name} v{version2Str(app.version)}', 0, 0)
     shared._appTitleRendered = True
 
+def actionsCheckAndExec():
+    actions = actionsCheck()
+    return actionsExec(actions) if actions else False
+def actionsCheck():
+    # print(f'    connected = {connected} | shared._inActionsCheck = {shared._inActionsCheck}')
+    if not sock.isConnected():
+        shared._inActionsCheck = False
+        if not lcdIsBusy(): lcd.clearLine(1)
+        return None
+    if not shared._inActionsCheck:
+        if not lcdIsBusy(): lcd.clearLine(range(1, 3));
+        lcd.writeIfReady('KOMUT BEKLENIYOR', 1, 2); print('awaiting remote command')
+        shared._inActionsCheck = True
+    resp = targetIP = actions = None
+    timeout = 0.5 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 1 else 0.05
+    try: resp = sock.wsRecv(timeout)
+    except (OSError, RuntimeError) as ex: resp = None
+    except Exception as ex: print('[ERROR]', 'APP sockRecv:', ex); print_exception(ex)
+    if not resp: return None
+    print(f'rawSocket interrupt: {json.dumps(resp)}')
+    if isinstance(resp, list): resp = { 'actions': resp }
+    targetIP = resp.get('ip'); actions = resp.get('actions')
+    if targetIP and targetIP != localIP:                                                                        # broadcast message match to local ip
+        print(f'[IGNORE] broadcast message => targetIP: [{targetIP} | localIP: [{localIP}]')
+        actions = None
+    return actions
+def actionsExec(actions):
+    if not actions: return False
+    print('  actions=', actions)
+    for item in actions:
+        busy(); action = item.get('action') or item.get('cmd')
+        print('<< action:', action)
+        if not action: continue 
+        handler = getattr(shared.handlers, action, None)
+        if handler is None:
+            print('[ERROR]  no matching handler', action)
+            continue
+        args = []
+        if 'args' in item: args = item['args']                                                                 # Eğer args bir listeyse direkt ekle, değilse tek öğe olarak al
+        else: args.append(_args)
+        print('<<     action args:', args)
+        try:
+            sleep(0.05); busy()
+            handler(*args)                                                                                     # ← [js]  handler.call(this, ...args) karşılığı
+        except Exception as ex:
+            print(f'[ERROR]  handler execution failed: {ex}')
+            # sock.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
+    return True 
+
+def onKeyPressed_defaultAction(key):
+    return True
+def onKeyReleased_defaultAction(key, duration):
+    lastTime = shared.lastTime._keySend
+    if lastTime and monotonic() - lastTime <= 0.8: return False
+    key = key.lower();
+    _id = 'primary' if key == '0' or key == 'enter' else key
+    lastTime = keypad._lastKeyPressTime
+    delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
+    lcdRows = range(2, 3)
+    if not lcdIsBusy():
+        lcd.clearLine(lcdRows); lcd.write(f'TUS: [{key}]', 2, 1)
+        lcd.write('...', 3, 1)
+    shared.lastTime._keySend = monotonic()
+    if sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS }):
+        if not lcdIsBusy():
+            lcd.clearLine(lcdRows); lcd.writeIfReady(f'* [{key}] GITTI', 2, 0)
+    else:
+        if not lcdIsBusy():
+            lcd.clearLine(lcdRows); lcd.writeIfReady(f'* WS ILETISIM SORUNU', 2, 0)
+    return True
+
+def onKeyPressed(key):
+    part = activePart()
+    if part:
+        result = part.onKeyPressed(key, duration)
+        if result: return result
+    return onKeyPressed_defaultAction(key)
+def onKeyReleased(key, duration):
+    part = activePart()
+    if part:
+        result = part.onKeyReleased(key, duration)
+        if result: return result    
+    return onKeyReleased_defaultAction(key, duration)
+
+
 def updateFiles():
     from os import rename, remove
+    shared._updateCheckPerformed = True
     autoUpdate = srv.autoUpdate; urls = getUpdateUrls()
     if autoUpdate is None: autoUpdate = shared.updateCheck != False
     if autoUpdate is None: autoUpdate = False
@@ -148,79 +237,9 @@ def updateFiles():
         except Exception as ex:
             print('[ERROR]', ex); print_exception(ex)
             continue
-    shared._updateCheckPerformed = true
     return True
 
-def actionsCheck():
-    resp = targetIP = actions = None
-    if not isBusy() and sock.isConnected:
-        try: resp = sock.wsRecv(.1)
-        except (OSError, RuntimeError) as ex: resp = None
-        except Exception as ex: print('[ERROR]', 'APP sockRecv:', ex); print_exception(ex)
-    if resp:
-        print(f'rawSocket interrupt: {json.dumps(resp)}')
-        if isinstance(resp, list):
-            resp = { 'actions': resp }
-    if resp:
-        targetIP = resp.get('ip')
-        actions = resp.get('actions')
-    if targetIP and targetIP != localIP:                                                                        # broadcast message match to local ip
-        print(f'[IGNORE] broadcast message => targetIP: [{targetIP} | localIP: [{localIP}]')
-        actions = None
-    return actions
+def test():
+    h.wsTalk('fnIslemi', { 'id': 2, 'ip': local.ip })
+    h.sockClose()
 
-def actionsExec(actions):
-    if not actions:
-        return False
-    for item in actions:
-        actionExec(item)
-    return True
-def actionsCheckAndExec():
-    actions = actionsCheck()
-    return actionsExec(actions) if actions else False
-def actionExec(item):
-    action = item.get('action') or item.get('cmd') if item and isinstance(item, dict) else None
-    if not action:
-        return False
-    handler = getattr(shared.handlers, action, None)
-    if handler is None:
-        print('[ERROR]  no matching handler', action)
-        return False
-    args = []
-    if 'args' in item:
-        _args = item['args']                                                                           # Eğer args bir listeyse direkt ekle, değilse tek öğe olarak al
-        if isinstance(_args, list): args.extend(_args)
-        else: args.append(_args)
-    try:
-        handler(*args)                                                                                 # ← [js]  handler.call(this, ...args) karşılığı
-        return True
-    except Exception as ex:
-        print(f'[ERROR]  handler execution failed: {ex}')
-        # sock.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
-        return False
-
-def onKeyPressed_defaultAction(key):
-    return True
-def onKeyReleased_defaultAction(key, duration):
-    key = key.lower();
-    _id = 'primary' if key == '0' or key == 'enter' else key
-    lastTime = keypad._lastKeyPressTime
-    delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
-    busy(); self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'TUS GONDER: [{key}]...', 2, 1)
-    self.wsSend('fnIslemi', { 'id': _id, 'delayMS': delayMS })
-    result = self.wsRecv(0)
-    self.lcdWrite(' ' * 20, 2, 0); self.lcdWrite(f'* [{key}] GITTI', 2, 0)
-    return True
-
-def onKeyPressed(key):
-    part = Part.current()
-    if part:
-        result = part.onKeyPressed(key, duration)
-        if result: return result
-    return onKeyPressed_defaultAction(key)
-def onKeyReleased(key, duration):
-    part = Part.current()
-    if part:
-        result = part.onKeyReleased(key, duration)
-        if result: return result    
-    return onKeyReleased_defaultAction(key, duration)

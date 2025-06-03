@@ -1,5 +1,6 @@
 from common import *
 from config import local, server as srv
+from part import *
 from time import sleep, monotonic
 import json
 from traceback import print_exception
@@ -67,18 +68,16 @@ class AppHandlers:
     def jsonReq(self, data, timeout=None):
         return self.dev.req.sendJSON(data, timeout)
     def lcdWrite(self, text, row=0, col=0):
-        self.dev.lcd.write(text, row, col)
+        if not lcdIsBusy():
+            self.dev.lcd.write(text, row, col, False)
         return self
     def lcdClearLine(self, row):
-        lcd = self.dev.lcd
-        if isinstance(row, (list, range)):
-            for _row in row:
-                lcd.clearLine(_row)
-        else:
-            lcd.clearLine(row)
+        if not lcdIsBusy():
+            self.dev.lcd.clearLine(row)
         return self
     def lcdClear(self):
-        self.dev.lcd.clear()
+        if not lcdIsBusy():
+            self.dev.lcd.clear()
         return self
     def ledWrite(self, rgb, col=0):
         self.dev.led.write(rgb, col)
@@ -113,5 +112,6 @@ class AppHandlers:
     def keypad_onReleased(self, key, duration):
         print(f'key_release: [{key}:{duration}]')
         handler = shared._onKeyReleased
-        if handler is not None: handler(key)
+        if handler is not None:
+            handler(key, duration)
 
