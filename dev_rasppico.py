@@ -31,7 +31,7 @@ class Eth(BaseEth):
         # if spi is not None: spi.deinit(); spi = None
         if cs is None: cs = self._cs = digitalio.DigitalInOut(board.GP17) if 'digitalio' in globals() else None
         if spi is None: spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16) if 'busio' in globals() else None
-        if reset is None: reset = self._reset = digitalio.DigitalInOut(board.GP20)
+        if reset is None: reset = self._reset = digitalio.DigitalInOut(board.GP20) if 'digitalio' in globals() else None
         eth = self.eth = WIZNET5K(spi, cs, reset, is_dhcp=is_dhcp) if 'WIZNET5K' in globals() else self
         if not is_dhcp: eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
         return self
@@ -80,22 +80,21 @@ class RawSocket(BaseRawSocket):
 
 # ---------- Keypad Control Class ----------
 class Keypad(BaseKeypad):
-    def __init__(self, onPressed = None, onRelease = None):
-        super().__init__()
-        self.onPressed = onPressed
-        self.onRelease = onRelease
-        keypadCfg = hw.keypad
-        rows = [getattr(board, pin) for pin in keypadCfg.rows] if 'board' in globals() else keypadCfg.rows
-        cols = [getattr(board, pin) for pin in keypadCfg.cols] if 'board' in globals() else keypadCfg.cols
-        keys = keypadCfg.keys
+    def __init__(self, onPressed = None, onReleased = None):
+        super().__init__(onPressed, onReleased)
+        cfg = hw.keypad
+        rows = [getattr(board, pin) for pin in cfg.rows] if 'board' in globals() else cfg.rows
+        cols = [getattr(board, pin) for pin in cfg.cols] if 'board' in globals() else cfg.cols
+        keys = cfg.keys
         self.keypad = Matrix_Keypad(rows, cols, keys) if 'Matrix_Keypad' in globals() else NS()
         self._pressed = {}
         # Performans için ek değişkenler
         self._last_scan_time = monotonic()
         self._min_scan_interval = 0.0002  # 2ms - optimal tarama sıklığı
     def update(self):
-        super().update()
-        now = monotonic()
+        super().update(); _pressed = self._pressed
+        onPressed = self.onPressed; onReleased = self.onReleased
+        lastTime = shared.lastTime
         # Daha sık tarama için, her çağrıda değil, minimum aralıktan sonra tara
         elapsed = now - self._last_scan_time
         if elapsed < self._min_scan_interval:
@@ -103,28 +102,24 @@ class Keypad(BaseKeypad):
             # time.sleep(0.0001)  # 0.1ms bekleme - isteğe bağlı
             return
         # Zamanı güncelle
-        self._last_scan_time = now
+        self._last_scan_time = monotonic()
         try:
             # Ana tarama kodunu hata yakalama içine al
             current_keys = set(self.keypad.pressed_keys)
             # Basılan yeni tuşları algıla
             for key in current_keys:
-                if key not in self._pressed:
-                    self._pressed[key] = now
-                    if self.onPress:
-                        self._lastKeyPressTime = monotonic()
-                        self.onPress(key)
+                if key not in _pressed:
+                    self._lastKeyPressTime = _pressed[key] = monotonic()
+                    if onPressed: onPressed(key)
             
             # Bırakılan tuşları kontrol et
-            released_keys = [key for key in self._pressed if key not in current_keys]
+            released_keys = [key for key in _pressed if key not in current_keys]
             for key in released_keys:
-                pressed_time = self._pressed.pop(key)
-                duration = now - pressed_time
+                pressed_time = _pressed.pop(key)
+                duration = now - pressed_time                                                       # 3 ondalık basamak hassasiyet (milisaniye)
                 # Tüm tuş bırakma olaylarını işle
-                if self.onRelease:
-                    # 3 ondalık basamak hassasiyet (milisaniye)
-                    self._lastKeyReleaseTime = monotonic()
-                    self.onRelease(key, duration)
+                self._lastKeyReleaseTime = monotonic()
+                if onReleased: onReleased(key, duration)
         except Exception as ex:
             # Herhangi bir hata olursa sessizce devam et
             print(f"Keypad tarama hatası: {ex}")

@@ -12,8 +12,8 @@ class AppHandlers:
         # lcd = dev.lcd; keypad = dev.keypad
         keypad = dev.keypad
         if keypad is not None:
-            keypad.set_onPress(self.keypad_onPressed)
-            keypad.set_onRelease(self.keypad_onReleased)
+            keypad.set_onPressed(self.keypad_onPressed)
+            keypad.set_onReleased(self.keypad_onReleased)
     
     ## Handler API Interface
     def exec(self, code):

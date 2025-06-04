@@ -17,13 +17,13 @@ class BaseRawSocket:
     def open(self):
         if not self.isConnected():
             busy(); srv = self.server
-            print('connect to:', f'{ip2Str(srv.ip)}:{srv.rawPort}')
+            print('! sock open:', f'{ip2Str(srv.ip)}:{srv.rawPort}')
         return not self.isConnected()
     def close(self):
         if self.isConnected():
             try: busy(); self.sock.close()
             except: pass
-            self.sock = None; print(f'! sock_close')
+            self.sock = None; print('! sock close')
         return self
     def send(self, data):
         if not self.isConnected(): return False
@@ -37,9 +37,9 @@ class BaseRawSocket:
                     self.close()
                     raise RuntimeError('Socket connection broken during send')
                 totalSize += size
-            print(f'> sock_send {totalSize}')
+            print('  >> sock send:', totalSize)
         except Exception as ex:
-            print("[SendError]", ex)
+            print('  !! sock send:', ex)
             self.close()
             return False
         shared.lastTime.heartbeat = monotonic()
@@ -76,20 +76,18 @@ class BaseRawSocket:
             # if errCode == 10054:
             #    self.close()
             if not (isinstance(ex, TimeoutError) or errCode == 116 or errCode == 10035):
-                print('[RecvError]', ex)
+                print('  !! sock recv:', ex)
                 print_exception(ex)
             return None
         except Exception as ex:
-            print('[RecvException]', ex)
-            print_exception(ex)
+            print('  !! sock recv:', ex); print_exception(ex)
             return None
         try:
             result = self._decodeLine(buffer)
             shared.lastTime.heartbeat = monotonic()
             return result
         except Exception as ex:
-            print('[RecvDataError]', ex)
-            print_exception(ex)
+            print('  !! sock recv:', ex); print_exception(ex)
             return None
     def talk(self, data, timeout=None):
         self.send(data)
@@ -118,11 +116,11 @@ class BaseRawSocket:
         result = None
         try:
             result = self.wsTalk('ping')
-            if not result: raise RuntimeError('recv response')
+            if not result: raise RuntimeError('check failed')
             # print('[wsHeartbeat] ', result)
             return True
         except Exception as ex:
-            print('[wsHeartbeat]', ex)
+            print('  !! wsHeartbeat:', ex)
             return False
         finally:
             if result is None:
@@ -151,8 +149,8 @@ class BaseRawSocket:
         data = buffer.decode('utf-8').splitlines()[0]
         try:
             if data: data = data.rstrip()
-            print(f'    < sock_recv {len(data)}')
+            print('    << sock recv:', len(data))
         except Exception as ex:
-            print(f'    < sock_recv {len(data)}  Data: {data}')
+            print('    !! sock recv:', ex)
             raise ex
         return data

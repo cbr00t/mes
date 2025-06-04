@@ -1,14 +1,15 @@
 ### devBase.py (Ortak Modül)
 
 class BaseKeypad:
-    def __init__(self, onPress = None, onRelease = None):
+    def __init__(self, onPressed = None, onReleased = None):
         self._lastKeyPressTime = self._lastKeyReleaseTime = None
+        self.onPressed = onPressed; self.onReleased = onReleased
         pass
     def update(self):
         return self
-    def set_onPress(self, handler):
-        self.onPress = handler
+    def set_onPressed(self, handler):
+        self.onPressed = handler
         return self
-    def set_onRelease(self, handler):
-        self.onRelease = handler
+    def set_onReleased(self, handler):
+        self.onReleased = handler
         return self

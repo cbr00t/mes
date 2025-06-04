@@ -1,11 +1,14 @@
 # ---------- dev_local.py ----------
 from common import *
-from config import server as srv
+from config import server as srv, hw
 from devBase import *
 from time import sleep
 import json
 import socket
 import requests
+from sys import stdin
+from os import system
+import keyboard
 
 # ---------- Ethernet Class (Mock) ----------
 class Eth(BaseEth):
@@ -16,7 +19,7 @@ class Eth(BaseEth):
         eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
     def init(self):
         super().init(); eth = self.eth
-        print("[LocalEth] initialized with:", eth.ifconfig)
+        print('! eth init:', eth.ifconfig)
         return self
 
 # ---------- Web Requests Class ----------
@@ -25,9 +28,7 @@ class WebReq(BaseWebReq):
         super().send(url, timeout)
         if timeout is None:
             timeout = 8
-        print(f'get request: {url}')
         result = requests.get(url, timeout)
-        print(f'... result: [{result}]')
         return result
 
 # ---------- Raw TCP Socket Class ----------
@@ -40,7 +41,7 @@ class RawSocket(BaseRawSocket):
         ep = (ip2Str(srv.ip), srv.rawPort)
         try:
             sock.connect(ep)
-            print(f'! sock_open', f'{ep[0]}:{ep[1]}')
+            print('! sock open', f'{ep[0]}:{ep[1]}')
         except Exception:
             sock = self.sock = None
             raise
@@ -48,47 +49,63 @@ class RawSocket(BaseRawSocket):
 
 # ---------- Keypad Class (Mock) ----------
 class Keypad(BaseKeypad):
-    def __init__(self, onPress = None, onRelease = None):
-        super().__init__(onPress, onRelease)
-        print("[Keypad] (mock) initialized.")
+    def __init__(self, onPressed = None, onReleased = None):
+        super().__init__(onPressed, onReleased)
+        print('! keypad init')
     def update(self):
-        super().update()
-        # print("[Keypad] updated.")
+        super().update();
+        if keyboard.is_pressed('enter'):
+            key = input('  > ')
+            onPressed = self.onPressed; onReleased = self.onReleased
+            self._lastKeyPressTime = monotonic()
+            if onPressed: onPressed(key)
+            sleep(0.2)                     # kısa bekleme
+            lastTime = self._lastKeyReleaseTime = monotonic()
+            if onReleased:
+                duration = monotonic() - lastTime
+                onReleased(key, duration)
         return self
 
 # ---------- LCD Class (Mock) ----------
 class LCDCtl(BaseLCD):
     def __init__(self):
         super().__init__()
-        print("[LCD] (mock) initialized.")
-    def clear(self):
-        super().clear()
-        print("[LCD] cleared.")
-        return self
+        print('! lcd init')
     def write(self, data, row=0, col=0, _internal=False):
-        super().write(data, row, col)
-        print(f"[LCD] write @({row},{col}):", data)
-        return self
+        result = super().write(data, row, col)
+        if not _internal: self._printBuffer()
+        return result
+    def clearLine(self, row):
+        result = super().clearLine(row)
+        self._printBuffer()
+        return result
+    def clear(self):
+        result = super().clear()
+        self._printBuffer()
+        return result
     def on(self):
         super().on()
-        print("[LCD] on")
+        print('! lcd on')
         return self
     def off(self):
         super().off()
-        print("[LCD] off")
+        print('! lcd off')
         return self
+    def _printBuffer(self):
+        system('cls'); print('\n')  # print('\033[2J')
+        return super()._printBuffer()
 
 class LEDCtl(BaseLED):
     def __init__(self):
         super().__init__()
-        print("[LED] (mock) initialized.")
+        print('! led init')
     def write(self, rgb, col):
-        super().write(rgb, col)
-        print(f"[LED] write: [{rgb}: {col}]")
-        return self
+        return super().write(rgb, col)
 
 class RFIDCtl(BaseRFID):
-    pass
+    def __init__(self):
+        super().__init__()
+        print('! rfid init')
 
 
 # ---------- Device Initialization ----------

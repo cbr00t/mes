@@ -5,6 +5,7 @@ from common import *
 class Part(NS):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        size = self.stdout().getRowCols()
         self._maxLen = self._maxLen or self.maxLenLimit()
         self._bufferOut = self.stdout()._buffer                                                                  # stdout - buffer ref
         inputs = self._inputs = self._inputs or {}
@@ -36,7 +37,7 @@ class Part(NS):
     @classmethod
     def maxLenLimit(cls):
         # get
-        return cls.stdout().getCols()
+        return size.cols - 2
     def maxLen(self, value=None):
         limit = self.maxLenLimit()
         # get
@@ -52,7 +53,7 @@ class Part(NS):
         # get
         if ind is None:
             curInd = self._curInputInd
-            return curInd if inputs and 0 <= curInd < count else 0
+            return curInd if inputs and 0 <= curInd < count else None
         # set
         if inputs and 0 <= ind < count:
             self._curInputInd = ind
@@ -63,7 +64,7 @@ class Part(NS):
             return None
         # get
         if not name:
-            return None if curInd is None else list(inputs.keys())[curInd]
+            return None if curInd is None else inputs.keys()[curInd]
         # set
         curInd = inputs.keys().index(name)
         if curInd is not None:
@@ -111,14 +112,12 @@ class Part(NS):
         Part.closeLast()
         return True
     def render(self):
-        self.out_clear()
-        self.out_write(self.title() or '', 0, 0)
-        self._render()
+        out = self.stdout()
+        out.clear()
+        out.write(self.title() or '', 0, 1)
         # ...
         # ...
         self._rendered = True
-    def _render(self):
-        pass
     def validateInput(self, data):
         return True
     def processInput(self, data):
@@ -129,22 +128,22 @@ class Part(NS):
         return False                                                                                               # by default, keyPress NOT handled by part
     def onKeyReleased(self, key, duration = None):
         _key = key.lower()
-        result = self.onKeyPressed_araIslem(key, _key, duration)
+        result = self.onKeyPressed_araIslem(key, _key, delayMS)
         if result != True:
             if _key == 'esc' or _key == 'f1':
                 if self.close():
                     return True                                                                                    # by default, keyRelease handled by part
             elif _key == '^':
-                self.selectPrevInput()
+                self._selectPrevInput()
             elif _key == 'v':
-                self.selectNextInput()
+                self._selectNextInput()
             else:
                 return False
         self.render()                                                                                              # Render LCD GUI for each keystroke
         if result is None:
             result = True
         return result                                                                                              # key handled by part or Internal result
-    def onKeyPressed_araIslem(self, key, _key, duration=None):
+    def onKeyPressed_araIslem(self, key, _key, delayMS = None):
         return None
     def onAttrChanged(self, defer = False):
         self._rendered = False
@@ -158,7 +157,7 @@ class Part(NS):
         return self.selectInput('_next')
     def selectPrevInput(self):
         return self.selectInput('_prev')
-    def selectInput(self, nameOrDirectionOrIndex):
+    def selectInput(nameOrDirectionOrIndex):
         if not nameOrDirectionOrIndex:
             return self
         name = nameOrDirectionOrIndex; old = self.curInputInd()
@@ -182,7 +181,7 @@ class Part(NS):
         self._rendered = False
         return self
     def out_write(self, data, row=0, col=0, _internal=False):
-        self.stdout().write(data, row, col, _internal)
+        self.stdout().write(data, row, col)
     def out_clear(self):
         self.stdout().clear()
     def out_clearLine(self, row):

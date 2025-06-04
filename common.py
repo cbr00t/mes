@@ -96,6 +96,10 @@ def safeImport(name, as_ = None):
     except Exception as ex:
         print(f"[ModuleError] {name} import failed:", ex)
         return None
+def isWindows():
+    import os
+    return os.name == 'nt'       # Windows
+
 def isCircuitPy():
     try:
         from sys import implementation as impl
