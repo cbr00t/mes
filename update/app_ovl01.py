@@ -42,7 +42,6 @@ def connectToServerIfNot():
             lcd.clearLine(range(1, 3))
 def renderAppTitle():
     dev = shared.dev; lcd = dev.lcd
-    if not lcdIsBusy():
-        lcd.clearLine(0)
-        lcd.write(f'{app.name} v{version2Str(app.version)}', 0, 0)
+    lcd.clearLine(0)
+    lcd.write(f'{app.name} v{version2Str(app.version)}', 0, 0)
     shared._appTitleRendered = True

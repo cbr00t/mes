@@ -96,6 +96,7 @@ class Keypad(BaseKeypad):
         onPressed = self.onPressed; onReleased = self.onReleased
         lastTime = shared.lastTime
         # Daha sık tarama için, her çağrıda değil, minimum aralıktan sonra tara
+        now = monotonic()
         elapsed = now - self._last_scan_time
         if elapsed < self._min_scan_interval:
             # Çok fazla CPU kullanmamak için küçük bir bekleme

@@ -67,7 +67,7 @@ class SubMenu(Menu):
         super().run(*args, **kwargs)
         if not self.isCallable(): return None
         from part_menu import MenuPart
-        part = MenuPart(_title = self.text(), _source = self, *args, **kwargs)
+        part = MenuPart(_title = self.text(), _source = self)
         part.run()
         return part
 
@@ -80,24 +80,22 @@ class MenuItem(Menu):
         # setter
         self._action = value
         return self
-    def run(self, sender=None, *args, **kwargs):
-        super().run(sender, *args, **kwargs)
+    def run(self, *args, **kwargs):
+        super().run(*args, **kwargs)
         if not self.isCallable(): return None
         _action = self.action()
         if not _action: return None
-        _locals = { 'self': self, 'sender': sender } 
+        _locals = { 'self': self } 
         try:
             if isinstance(_action, str):
                 exec(_action, globals(), _locals)
                 __action = _locals.get('callback', None)
                 if __action is not None: _action = __action
             if not callable(_action): return None
-            try: return _action(self, sender, *args, **kwargs)
-            except:
-                try: return _action(sender, *args, **kwargs)
-                except:
-                    try: return _action(*args, **kwargs)
-                    except: return _action()
+            argc = _action.__code__.co_argcount
+            if argc == 0: return _action()
+            elif argc == 1: return _action(self)
+            else: return _action(self, *args, **kwargs)
         except Exception as ex:
             # print(f'[ERROR]  menu handler execution failed: {ex}')
             raise ex

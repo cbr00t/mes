@@ -7,7 +7,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 0, 16)
+    version                         = (1, 0, 0, 17)
 )
 
 
@@ -98,37 +98,3 @@ else:
     server.ip                       =  (192, 168, 1, 48)
   # server.ip                       =  (192, 168, 1, 200)
 
-
-
-def initMenus():
-    global menus
-    if 'menus' in globals() and menus is not None:
-        return menus
-
-    ###############################
-    #           Menüler           #
-    ###############################
-    from menu import Menu, SubMenu, MenuItem
-    menus = NS(
-        main = SubMenu(
-            _text = 'Ana Menü',
-            _items = [
-                MenuItem(_text = 'item1', _action = "print('item 1')"),
-                SubMenu(_text = 'item2', _items = [
-                    MenuItem(_text = 'sub-item1', _action = "print(self.text())"),
-                    MenuItem(_text = 'sub-item2', _action = "print(self.text())"),
-                    MenuItem(_text = 'sub-item3', _action = "print('sub-item 3')"),
-                    MenuItem(_text = 'sub-item4', _action = "print('sub-item 4')"),
-                    MenuItem(_text = 'sub-item5', _action = "print('sub-item 5')"),
-                    MenuItem(_text = 'CIKIS', _action = "self.close()")
-                ]),
-                MenuItem(_text = 'CIKIS', _action = "self.close()")
-                # VEYA - MenuItem(_text = 'Çıkış', _action = 'def callback(self, sender=None): sender.close()')
-            ]
-        )
-    )
-    return menus
-
-def getMenu(name=None):
-    initMenus()
-    return getattr(menus, name, None) if name else menus

@@ -32,7 +32,6 @@ class MenuPart(Part):
                       _source if isinstance(_source, (str, tuple, list)) or callable(_source) else \
                       [_source]
         _source = self._source = _source or []
-        _inputs = self._inputs = {}
         _lastId = self._lastId or 0
         if isinstance(_source, Menu): _source.parentPart(self)
         for item in _source:
@@ -45,7 +44,7 @@ class MenuPart(Part):
                 else: item.id = id
             if hasattr(item, 'parentPart') and callable(item.parentPart): item.parentPart(self)
             else: setattr(item, '_parentPart', self)
-            _inputs[id] = item
+            self.addInput(id, item)
         self.onAttrChanged()
         return self
     # def onKeyPressed_araIslem(self, key, _key, duration=None):

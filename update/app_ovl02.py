@@ -1,5 +1,7 @@
 from common import *
-from config import local, getMenu
+from config import local
+from menu import SubMenu, MenuItem
+from app_ovl03 import *
 from time import sleep, monotonic
 import json
 from traceback import print_exception
@@ -82,6 +84,12 @@ def onKeyReleased_defaultAction(key, duration):
     lastTime = shared.lastTime._keySend = monotonic()
     if key == '0':
         getMenu('main').run()
+    elif key == '3':
+        mnu = getMenu_duraksamaNedenleri()
+        if mnu: mnu.run()
+    elif key == 'x':
+        from part_input import InputPart
+        InputPart(_title = 'Input Test', _val = 'cik').run()
     else:
         _id = 'secondary' if key == 'enter' else key
         if sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS }):

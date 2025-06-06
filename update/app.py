@@ -29,7 +29,6 @@ def run():
     lcd.clear(); lcd.write('SHUTDOWN', 1,1)
     sock.close()
 
-
 def loop():
     global cpuHaltTime
     cpuHaltTime = 0.2 if isIdle() else 0.01; sleep(cpuHaltTime)

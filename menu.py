@@ -81,7 +81,7 @@ class MenuItem(Menu):
         self._action = value
         return self
     def run(self, *args, **kwargs):
-        super().run(sender, *args, **kwargs)
+        super().run(*args, **kwargs)
         if not self.isCallable(): return None
         _action = self.action()
         if not _action: return None
@@ -92,12 +92,10 @@ class MenuItem(Menu):
                 __action = _locals.get('callback', None)
                 if __action is not None: _action = __action
             if not callable(_action): return None
-            try: return _action(self, sender, *args, **kwargs)
-            except:
-                try: return _action(sender, *args, **kwargs)
-                except:
-                    try: return _action(*args, **kwargs)
-                    except: return _action()
+            argc = _action.__code__.co_argcount
+            if argc == 0: return _action()
+            elif argc == 1: return _action(self)
+            else: return _action(self, *args, **kwargs)
         except Exception as ex:
             # print(f'[ERROR]  menu handler execution failed: {ex}')
             raise ex

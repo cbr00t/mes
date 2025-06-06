@@ -41,7 +41,7 @@ class Shared(NS):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.updateCheck = True
-        self.lastTime = NS()
+        self.lastTime = NS(); self._globals = NS()
         self._base64_alphabet = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 # Functions
