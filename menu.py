@@ -67,7 +67,7 @@ class SubMenu(Menu):
         super().run(*args, **kwargs)
         if not self.isCallable(): return None
         from part_menu import MenuPart
-        part = MenuPart(_title = self.text(), _source = self, *args, **kwargs)
+        part = MenuPart(_title = self.text(), _source = self)
         part.run()
         return part
 
@@ -80,12 +80,12 @@ class MenuItem(Menu):
         # setter
         self._action = value
         return self
-    def run(self, sender=None, *args, **kwargs):
+    def run(self, *args, **kwargs):
         super().run(sender, *args, **kwargs)
         if not self.isCallable(): return None
         _action = self.action()
         if not _action: return None
-        _locals = { 'self': self, 'sender': sender } 
+        _locals = { 'self': self } 
         try:
             if isinstance(_action, str):
                 exec(_action, globals(), _locals)

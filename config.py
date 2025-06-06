@@ -7,7 +7,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 0, 15)
+    version                         = (1, 0, 0, 16)
 )
 
 
@@ -115,14 +115,14 @@ def initMenus():
             _items = [
                 MenuItem(_text = 'item1', _action = "print('item 1')"),
                 SubMenu(_text = 'item2', _items = [
-                    MenuItem(_text = 'sub-item1', _action = "print('sub-item 1')"),
-                    MenuItem(_text = 'sub-item2', _action = "print('sub-item 2')"),
+                    MenuItem(_text = 'sub-item1', _action = "print(self.text())"),
+                    MenuItem(_text = 'sub-item2', _action = "print(self.text())"),
                     MenuItem(_text = 'sub-item3', _action = "print('sub-item 3')"),
                     MenuItem(_text = 'sub-item4', _action = "print('sub-item 4')"),
                     MenuItem(_text = 'sub-item5', _action = "print('sub-item 5')"),
-                    MenuItem(_text = 'Çıkış', _action = "self.close()")
+                    MenuItem(_text = 'CIKIS', _action = "self.close()")
                 ]),
-                MenuItem(_text = 'Çıkış', _action = "self.close()")
+                MenuItem(_text = 'CIKIS', _action = "self.close()")
                 # VEYA - MenuItem(_text = 'Çıkış', _action = 'def callback(self, sender=None): sender.close()')
             ]
         )

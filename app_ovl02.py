@@ -82,6 +82,9 @@ def onKeyReleased_defaultAction(key, duration):
     lastTime = shared.lastTime._keySend = monotonic()
     if key == '0':
         getMenu('main').run()
+    if key == 'x':
+        from part_input import InputPart
+        InputPart(_title = 'Input Test', _val = 'cik').run()
     else:
         _id = 'secondary' if key == 'enter' else key
         if sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS }):
