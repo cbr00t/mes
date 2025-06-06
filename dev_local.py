@@ -77,11 +77,11 @@ class LCDCtl(BaseLCD):
         return result
     def clearLine(self, row):
         result = super().clearLine(row)
-        self._printBuffer()
+        # self._printBuffer()
         return result
     def clear(self):
         result = super().clear()
-        self._printBuffer()
+        # self._printBuffer()
         return result
     def on(self):
         super().on()

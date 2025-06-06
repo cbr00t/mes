@@ -1,5 +1,5 @@
 from common import *
-from config import local
+from config import local, getMenu
 from time import sleep, monotonic
 import json
 from traceback import print_exception
@@ -55,32 +55,10 @@ def actionsExec(actions):
             # sock.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
     return True 
 
-def onKeyPressed_defaultAction(key):
-    return True
-def onKeyReleased_defaultAction(key, duration):
-    dev = shared.dev; lcd = dev.lcd; sock = dev.sock; keypad = dev.keypad
-    lastTime = shared.lastTime._keySend
-    if lastTime and monotonic() - lastTime <= 0.8: return False
-    key = key.lower();
-    _id = 'secondary' if key == '0' or key == 'enter' else key
-    lastTime = keypad._lastKeyPressTime
-    delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
-    lcdRows = range(2, 3)
-    if not lcdIsBusy():
-        lcd.clearLine(lcdRows); lcd.write(f'TUS: [{key}]', 2, 1)
-        lcd.write('...', 3, 1)
-    shared.lastTime._keySend = monotonic()
-    if sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS }):
-        if not lcdIsBusy():
-            lcd.clearLine(lcdRows); lcd.writeIfReady(f'* [{key}] GITTI', 2, 0)
-    else:
-        if not lcdIsBusy():
-            lcd.clearLine(lcdRows); lcd.writeIfReady(f'* WS ILETISIM SORUNU', 2, 0)
-    return True
 def onKeyPressed(key):
     part = activePart()
     if part:
-        result = part.onKeyPressed(key, duration)
+        result = part.onKeyPressed(key)
         if result: return result
     return onKeyPressed_defaultAction(key)
 def onKeyReleased(key, duration):
@@ -89,3 +67,27 @@ def onKeyReleased(key, duration):
         result = part.onKeyReleased(key, duration)
         if result: return result    
     return onKeyReleased_defaultAction(key, duration)
+
+def onKeyPressed_defaultAction(key):
+    return True
+def onKeyReleased_defaultAction(key, duration):
+    dev = shared.dev; lcd = dev.lcd; sock = dev.sock; keypad = dev.keypad
+    lastTime = shared.lastTime._keySend; key = key.lower()
+    if lastTime and monotonic() - lastTime <= 0.8: return False
+    lastTime = keypad._lastKeyPressTime; delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
+    lcdRows = range(2, 3)
+    if not lcdIsBusy():
+        lcd.clearLine(lcdRows); lcd.write(f'TUS: [{key}]', 2, 1)
+        lcd.write('...', 3, 1)
+    lastTime = shared.lastTime._keySend = monotonic()
+    if key == '0':
+        getMenu('main').run()
+    else:
+        _id = 'secondary' if key == 'enter' else key
+        if sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': delayMS }):
+            if not lcdIsBusy():
+                lcd.clearLine(lcdRows); lcd.writeIfReady(f'* [{key}] GITTI', 2, 0)
+        else:
+            if not lcdIsBusy():
+                lcd.clearLine(lcdRows); lcd.writeIfReady(f'* WS ILETISIM SORUNU', 2, 0)
+    return True

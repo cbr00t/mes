@@ -1,2 +1,5 @@
 import app
-app.init(); app.run()
+app.init()
+app.onKeyReleased('0', 500)
+app.run()
+

@@ -10,6 +10,9 @@ if not 'encoding' in globals():
 # ---------- General Structures ----------
 class NS:
     @classmethod
+    def _super(cls, self):
+        return super(cls, self)
+    @classmethod
     def getInstVars(cls):
         return []
     def __init__(self, **kwargs):
@@ -85,7 +88,6 @@ def withErrCheckEx(func, exClass):
     return wrapper
 def withErrCheck(func):
     return withErrCheckEx(func, Exception)
-
 def dynImport(name, as_ = None):
     mod = __import__(name)
     globals()[as_ or name] = mod
@@ -96,6 +98,10 @@ def safeImport(name, as_ = None):
     except Exception as ex:
         print(f"[ModuleError] {name} import failed:", ex)
         return None
+def isWindows():
+    import os
+    return os.name == 'nt'       # Windows
+
 def isCircuitPy():
     try:
         from sys import implementation as impl

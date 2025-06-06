@@ -31,17 +31,17 @@ class BaseLCD:
         return self.readLines().join('\n')
     def write(self, data, row=0, col=0, _internal=False):
         if not _internal: self._lastWriteTime = monotonic()
+        rowCount = self.getRows()
+        if not (0 <= row < rowCount): return self
         buf = self._buffer
         for i, ch in enumerate(data):
             if col + i < len(buf[row]):
                 buf[row][col + i] = ch
         return self
     def clearLine(self, row):
-        if isinstance(row, range):
-            row = range(row.start, row.stop + 1)
+        if isinstance(row, range): row = range(row.start, row.stop + 1)
         if isinstance(row, (list, range)):
-            for _row in row:
-                self.clearLine(_row)
+            for _row in row: self.clearLine(_row)
             return self
         self.write(' ' * hw.lcd.cols, row, 0, True)
         self._lastWriteTime = None
@@ -65,8 +65,9 @@ class BaseLCD:
         return self
     def _printBuffer(self):
         cols = shared.dev.lcd.getCols(); limit = cols + 4
+        lines = self._read(asString=True)
         print('#' * limit)
-        for line in self._read(asString=True):
+        for line in lines:
             text = line.ljust(cols)
             print(f'# {text} #')
         print('#' * limit)

@@ -7,17 +7,17 @@ class BaseLCD:
     def __init__(self):
         self._lastWriteTime = None
         size = self.getRowCols()
-        self._buffer = [['' for _ in range(size.cols + 1)] for _ in range(size.rows + 1)]          # lcd matrix data buffer
+        self._buffer = [['' for _ in range(size.cols)] for _ in range(size.rows)]          # lcd matrix data buffer
     @classmethod
     def getRowCols(cls):
         cfg = hw.lcd
         return NS(rows = cfg.rows, cols = cfg.cols)
     @classmethod
     def getRows(cls):
-        return self.getRowCols().rows
+        return cls.getRowCols().rows
     @classmethod
     def getCols(cls):
-        return self.getRowCols().cols
+        return cls.getRowCols().cols
     def _read(self, asString=False):
         buf = self._buffer
         return [''.join(row) for row in buf] if asString else buf
@@ -31,18 +31,17 @@ class BaseLCD:
         return self.readLines().join('\n')
     def write(self, data, row=0, col=0, _internal=False):
         if not _internal: self._lastWriteTime = monotonic()
+        rowCount = self.getRows()
+        if not (0 <= row < rowCount): return self
         buf = self._buffer
         for i, ch in enumerate(data):
             if col + i < len(buf[row]):
                 buf[row][col + i] = ch
         return self
     def clearLine(self, row):
-        print(f'[LCD] clearLine: row={row}')
-        if isinstance(row, range):
-            row = range(row.start, row.stop + 1)
+        if isinstance(row, range): row = range(row.start, row.stop + 1)
         if isinstance(row, (list, range)):
-            for _row in row:
-                self.clearLine(_row)
+            for _row in row: self.clearLine(_row)
             return self
         self.write(' ' * hw.lcd.cols, row, 0, True)
         self._lastWriteTime = None
@@ -64,3 +63,12 @@ class BaseLCD:
         return self
     def off(self):
         return self
+    def _printBuffer(self):
+        cols = shared.dev.lcd.getCols(); limit = cols + 4
+        lines = self._read(asString=True)
+        print('#' * limit)
+        for line in lines:
+            text = line.ljust(cols)
+            print(f'# {text} #')
+        print('#' * limit)
+        print()

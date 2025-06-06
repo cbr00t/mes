@@ -19,8 +19,8 @@ class InputPart(Part):
         value = value or 0; 
         self._curPos = _maxLen0 if value < 0 else min(value, _maxLen0)
         return self
-    def onKeyPressed_araIslem(self, key, _key, duration = None):
-        result = super().onKeyPressed_araIslem(key, _key, delayMS)
+    def onKeyPressed_araIslem(self, key, _key, duration=None):
+        result = super().onKeyPressed_araIslem(key, _key, duration)
         if result is not None: return result
         buf = self._bufferIn
         if _key == 'enter':
@@ -38,8 +38,8 @@ class InputPart(Part):
                 self._commitInput(buf)
         return True
     def _commitInput(self, data):
-        if not editable(): return False
-        if not (self.validateInput(data)): return False
+        if not self.editable(): return False
+        if not self.validateInput(data): return False
         result = self.processInput(self, data)
         buf = self._bufferIn = ''
         return result
