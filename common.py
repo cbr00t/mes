@@ -42,6 +42,7 @@ class Shared(NS):
         super().__init__(*args, **kwargs)
         self.updateCheck = True
         self.lastTime = NS(); self._globals = NS()
+        self.queues = NS()
         self._base64_alphabet = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 # Functions
@@ -156,13 +157,6 @@ def getWSUrl(qs = None, wsPath = None, api = None, https = None):
             result += f'&{str(key)}'
             if value: result += f'={value}'
     return result.rstrip('&')
-def getHeartbeatInterval():
-    if isBusy(): return None
-    from config import server as srv
-    hearbeatInterval = srv.hearbeatInterval
-    if (hearbeatInterval or 0) <= 0: return None
-    if isIdle(): return hearbeatInterval * 3
-    return hearbeatInterval
 
 def activePart():
     return shared.activePart() if shared.activePart is not None else None
@@ -183,10 +177,28 @@ def lcdCanBeCleared():
     isBusy = lcdIsBusy(); lastTime = shared.dev.lcd._lastWriteTime
     # print('lcd_lastWriteTime =', lastTime)
     return not isBusy and lastTime and (monotonic() - lastTime) >= clearDelay
+def getHeartbeatInterval():
+    if isBusy(): return None
+    from config import server as srv
+    intv = srv.hearbeatInterval
+    if (intv or 0) <= 0: return None
+    if isIdle(): return intv * 3
+    return intv
 def heartbeatShouldBeChecked():
     if isBusy(): return False 
-    hearbeatInterval = getHeartbeatInterval(); lastTime = shared.lastTime.heartbeat or 0
-    return hearbeatInterval and monotonic() - lastTime > hearbeatInterval
+    intv = getHeartbeatInterval(); lastTime = shared.lastTime.heartbeat or 0
+    return intv and monotonic() - lastTime > intv
+def getStatusCheckInterval():
+    if isBusy(): return None
+    from config import server as srv
+    intv = srv.statusCheckInterval
+    if (intv or 0) <= 0: return None
+    if isIdle(): return intv * 3
+    return intv
+def statusShouldBeChecked():
+    if isBusy(): return False 
+    intv = getStatusCheckInterval(); lastTime = shared.lastTime.statusCheck or 0
+    return intv and monotonic() - lastTime > intv
 def getWSData(api, args = None, data = None, wsPath = None):
     from config import server as srv
     if data is not None and isinstance(data, (dict, list)):

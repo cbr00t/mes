@@ -35,9 +35,10 @@ class InputPart(Part):
             if self.commitInput():
                 self.close()
             return True
-        elif _key == 'esc' or _key == 'x':
-            if _key == 'esc':
-                self.close(); return True
+        elif _key == 'esc':
+            self.close()
+            return True
+        elif _key == 'x':
             if _val:
                 _val = _val[:-1]; self.val(_val)
                 self.curPrev()
@@ -48,9 +49,15 @@ class InputPart(Part):
         else:
             maxLen = self.maxLen() - self.renderStartPos()
             if len(_val) + 1 < maxLen:
-                _val += key; self.val(_val)
-                if self.commitInput(): _val = self.val(); self.curNext()
-                else: _val = self.val()[:-1]; self.val(_val)
+                pos = self.curPos
+                if pos < 0: pos = 0
+                if pos > len(_val): pos = len(_val)
+                _val = _val[:pos] + key + _val[pos:]
+                self.val(_val)
+                if self.commitInput():
+                    _val = self.val(); self.curNext()
+                else:
+                    _val = self.val()[:-1]; self.val(_val)
         self.render()
         return True
     def _render_son(self):

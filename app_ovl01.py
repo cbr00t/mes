@@ -38,8 +38,7 @@ def connectToServerIfNot():
         print('[ERROR]', ex); print_exception(ex)
         return False
     finally:
-        if not lcdIsBusy():
-            lcd.clearLine(range(1, 3))
+        if not lcdIsBusy(): lcd.clearLine(range(1, 3))
 def renderAppTitle():
     dev = shared.dev; lcd = dev.lcd
     lcd.clearLine(0)
