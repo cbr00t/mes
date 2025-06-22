@@ -24,7 +24,7 @@ def updateFiles():
         try:
             resp = sock.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=3)
             print(f'<< resp', resp)
-            resp = resp['data']['string'] if isinstance(resp, dict) else None
+            resp = resp.get('data', dict()).get('string') if isinstance(resp, dict) else None
             # if resp:
             #     try: resp = from64(resp.encode(encoding))
             #     except Exception as ex: print(ex); continue
@@ -51,7 +51,7 @@ def updateFiles():
                 lcd.write(name, 2, 5)
             # Uzak Dosyayı indir
             fileContent = sock.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=3)
-            fileContent = fileContent['data']['string'] if isinstance(fileContent, dict) else None
+            fileContent = fileContent.get('data', dict()).get('string') if isinstance(fileContent, dict) else None
             gc.collect()
             if fileContent:
                 if fileContent: fileContent = fileContent.replace('\r', '')

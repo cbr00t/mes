@@ -19,8 +19,9 @@ def actionsCheck():
         if not lcdIsBusy(): lcd.clearLine(1)
         return None
     if not shared._inActionsCheck:
-        if not lcdIsBusy(): lcd.clearLine(range(1, 3));
-        lcd.writeIfReady('KOMUT BEKLENIYOR', 1, 2); print('awaiting remote command')
+        # lcd.clearLineIfReady(range(1, 3));
+        # lcd.writeIfReady('KOMUT BEKLENIYOR', 1, 2)
+        print('awaiting remote command')
         shared._inActionsCheck = True
     resp = targetIP = actions = None
     timeout = 0.5 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 1 else 0.05
@@ -56,20 +57,15 @@ def actionsExec(actions):
         except Exception as ex:
             print(f'[ERROR]  handler execution failed: {ex}')
             # sock.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
-    return True 
+    return True
+
 
 def onKeyPressed(key):
     part = activePart()
-    if part:
-        result = part.onKeyPressed(key)
-        if result: return result
-    return onKeyPressed_defaultAction(key)
+    return part.onKeyPressed(key) if part else onKeyPressed_defaultAction(key)
 def onKeyReleased(key, duration):
     part = activePart()
-    if part:
-        result = part.onKeyReleased(key, duration)
-        if result: return result    
-    return onKeyReleased_defaultAction(key, duration)
+    return part.onKeyReleased(key, duration) if part else onKeyReleased_defaultAction(key, duration)
 
 def onKeyPressed_defaultAction(key):
     return True
@@ -80,12 +76,11 @@ def onKeyReleased_defaultAction(key, duration):
     lastTime = keypad._lastKeyPressTime; delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
     lcdRows = range(2, 3)
     # lcd.clearLineIfReady(lcdRows)
-    lcd.writeLineIfReady(f'TUS: [{key}]', 2, 1)
-    lcd.writeLineIfReady('...', 3, 1)
+    lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
     lastTime = shared.lastTime._keySend = monotonic()
     # if key == '0':
     #    getMenu('main').run()
-    if key == '2':
+    if key == '3':
         mnu = getMenu_duraksamaNedenleri()
         if mnu: mnu.run()
     # elif key == 'x':
@@ -97,7 +92,8 @@ def onKeyReleased_defaultAction(key, duration):
             processQueues()
             if not sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': duration }):
                 raise RuntimeError()
-            lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
+            # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
+            sleep(0.1); lcd.clearLineIfReady(lcd.getRows() - 1) 
         except Exception as ex:
             # lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
             print_exception(ex)

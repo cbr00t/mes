@@ -19,8 +19,9 @@ def actionsCheck():
         if not lcdIsBusy(): lcd.clearLine(1)
         return None
     if not shared._inActionsCheck:
-        if not lcdIsBusy(): lcd.clearLine(range(1, 3));
-        lcd.writeIfReady('KOMUT BEKLENIYOR', 1, 2); print('awaiting remote command')
+        # lcd.clearLineIfReady(range(1, 3));
+        # lcd.writeIfReady('KOMUT BEKLENIYOR', 1, 2)
+        print('awaiting remote command')
         shared._inActionsCheck = True
     resp = targetIP = actions = None
     timeout = 0.5 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 1 else 0.05

@@ -123,11 +123,13 @@ class Part(NS):
         if cur:
             cur._toggleSnapshot(revert)
             cur.render()
-        else: _clear = True
+        else:
+            _clear = True
         if _clear:
             from app_ovl03 import updateMainScreen
             out = Part.stdout(); out.clear();
             shared._appTitleRendered = shared._inActionsCheck = False
+            shared.lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = None
             updateMainScreen()
         print('part stack len:', len(Part.stack()))
     def canClose(self):

@@ -71,4 +71,3 @@ def updateSelf():
     updateFiles()
     lcd.clearLine(3); lcd.write('REBOOTING...', 3, 2)
     h.reboot()
-

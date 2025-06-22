@@ -43,15 +43,22 @@ def updateMainScreen():
     renderAppTitle()
     # if lcdCanBeCleared(): lcd.clearLineIfReady(range(1, lcd.getRows() - 1))
     rec = shared.curStatus
-    rec = rec and rec[0] if isinstance(rec, list) else rec
-    if not rec: return False
+    rec = rec and rec[0] if isinstance(rec, list) else {}
     _rec = {k: v for k, v in rec.items() if 'Sure' not in k}
     text = json.dumps(_rec)
+    def str_val(key):
+        return rec.get(key) or ''
+    def int_val(key):
+        value = rec.get(key)
+        return int(value) if isinstance(value, (str, int, float)) else 0
     if text != shared._updateMainScreen_lastDebugText:
         print(f'\nstatus_check:  \n  {text}\n')
         shared._updateMainScreen_lastDebugText = text
-        lcd.writeLineIfReady(f"U:{int(rec.get('onceUretMiktar'))}+{int(rec.get('aktifUretMiktar'))}  C:{rec.get('onceCevrimSayisi')}+{int(rec.get('aktifCevrimSayisi'))}", 1, 0)
-        lcd.writeLineIfReady(f"S:{int(rec.get('isSaymaInd'))}/{int(rec.get('isSaymaSayisi'))}    D:{rec.get('durumKod')}", 2, 0)
+        lcd.writeLineIfReady(\
+            f"U:{int_val('onceUretMiktar')}+{int_val('aktifUretMiktar')}  " + \
+            f"S:{int_val('isSaymaInd')}/{int_val('isSaymaSayisi')}", \
+            1, 0)
+        lcd.writeLineIfReady(f"D:{str_val('durumKod')}", 2, 0)
         lastTime.updateMainScreen = monotonic()
     return True
 

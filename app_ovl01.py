@@ -17,6 +17,8 @@ def ethCheck():
 def connectToServerIfNot():
     dev = shared.dev; lcd = dev.lcd; sock = dev.sock; lastTime = shared.lastTime
     if sock.isConnected(): lastTime.srvConnectMsg = None; return True
+    shared._appTitleRendered = False
+    shared.lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = None
     if not ethCheck(): return False
     shared._inActionsCheck = False; lastTime = shared.lastTime
     srvIP = ip2Str(srv.ip); srvPort = srv.rawPort

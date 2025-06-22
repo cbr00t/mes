@@ -5,4 +5,3 @@ class BaseLED:
         return self
     def clear(self, col):
         return self.write((0, 0, 0), col)
-
