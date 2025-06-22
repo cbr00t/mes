@@ -50,7 +50,7 @@ def updateFiles():
                 lcd.clearLine(range(1, 3)); lcd.write('UPDATING:', 1, 1)
                 lcd.write(name, 2, 5)
             # Uzak Dosyayı indir
-            fileContent = sock.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=5)
+            fileContent = sock.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=3)
             fileContent = fileContent['data']['string'] if isinstance(fileContent, dict) else None
             gc.collect()
             if fileContent:

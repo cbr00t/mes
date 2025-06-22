@@ -56,20 +56,15 @@ def actionsExec(actions):
         except Exception as ex:
             print(f'[ERROR]  handler execution failed: {ex}')
             # sock.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
-    return True 
+    return True
+
 
 def onKeyPressed(key):
     part = activePart()
-    if part:
-        result = part.onKeyPressed(key)
-        if result: return result
-    return onKeyPressed_defaultAction(key)
+    return part.onKeyPressed(key) if part else onKeyPressed_defaultAction(key)
 def onKeyReleased(key, duration):
     part = activePart()
-    if part:
-        result = part.onKeyReleased(key, duration)
-        if result: return result    
-    return onKeyReleased_defaultAction(key, duration)
+    return part.onKeyReleased(key, duration) if part else onKeyReleased_defaultAction(key, duration)
 
 def onKeyPressed_defaultAction(key):
     return True
@@ -79,9 +74,8 @@ def onKeyReleased_defaultAction(key, duration):
     if lastTime and monotonic() - lastTime <= 0.8: return False
     lastTime = keypad._lastKeyPressTime; delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
     lcdRows = range(2, 3)
-    if not lcdIsBusy():
-        lcd.clearLine(lcdRows); lcd.write(f'TUS: [{key}]', 2, 1)
-        lcd.write('...', 3, 1)
+    # lcd.clearLineIfReady(lcdRows)
+    lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
     lastTime = shared.lastTime._keySend = monotonic()
     # if key == '0':
     #    getMenu('main').run()
@@ -93,10 +87,15 @@ def onKeyReleased_defaultAction(key, duration):
     #    InputPart(_title = 'Input Test', _val = 'cik').run()
     else:
         _id = 'secondary' if key == 'enter' else key
-        if not lcdIsBusy(): lcd.clearLine(lcdRows); lcd.write(f'[{key}] KUYRUGA', 2, 1)
-        keyQueue_add({ 'ts': monotonic(), 'id': _id, 'delayMS': duration })
-        # if sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': duration }):
-        #     if not lcdIsBusy(): lcd.clearLine(lcdRows); lcd.writeIfReady(f'* [{key}] GITTI', 2, 0)
-        # else:
-        #     if not lcdIsBusy(): lcd.clearLine(lcdRows); lcd.writeIfReady(f'* WS ILETISIM SORUNU', 2, 0)
+        try:
+            processQueues()
+            if not sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': duration }):
+                raise RuntimeError()
+            # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
+            sleep(0.1); lcd.clearLineIfReady(lcd.getRows() - 1) 
+        except Exception as ex:
+            # lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
+            print_exception(ex)
+            lcd.writeLineIfReady(f'[{key}] KUYRUGA', 2, 1)
+            keyQueue_add({ 'ts': monotonic(), 'id': _id, 'delayMS': duration })
     return True

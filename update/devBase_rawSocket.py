@@ -15,6 +15,10 @@ class BaseRawSocket:
     def getDefaultTimeout(self):
         return srv.socketTimeout
     def open(self):
+        self._open(); connected = self.isConnected()
+        self.onOpen() if connected else self.onClose()
+        return connected
+    def _open(self):
         if not self.isConnected():
             busy(); srv = self.server
             print('! sock open:', f'{ip2Str(srv.ip)}:{srv.rawPort}')
@@ -24,7 +28,14 @@ class BaseRawSocket:
             try: busy(); self.sock.close()
             except: pass
             self.sock = None; print('! sock close')
+        self.onClose()
         return self
+    def onOpen(self):
+        dev = shared.dev; lcd = dev.lcd if dev else None
+        if lcd: lcd.write('^', 0, lcd.getCols() - 6)
+    def onClose(self):
+        dev = shared.dev; lcd = dev.lcd if dev else None
+        if lcd: lcd.write('x', 0, lcd.getCols() - 6)
     def send(self, data):
         if not self.isConnected(): return False
         buffer = self._encodeLine(data)
@@ -48,7 +59,7 @@ class BaseRawSocket:
         if not self.isConnected(): return None
         sock = self.sock; buffer = b''
         try:
-            sock.settimeout(0.05); chunk = b''
+            sock.settimeout(0.02); chunk = b''
             try:
                 chunk = sock.recv(1)
             except Exception:  # ilk veri gelmezse erken çık
@@ -112,6 +123,25 @@ class BaseRawSocket:
         return self.recvJSON(timeout)
     def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
         return self.talkJSON(getWSData(api, args, data, wsPath), timeout)
+    def wsCheckStatusIfNeed(self, timeout=None):
+        return self.wsCheckStatus(timeout) if statusShouldBeChecked() else False
+    def wsCheckStatus(self, timeout=None):
+        result = None
+        try:
+            result = self.wsTalk('tekilTezgahBilgi')
+            if not result: raise RuntimeError('check failed')
+            if isinstance(result, str): result = json.loads(result)
+            if result: shared.curStatus = result
+            # print('[wsCheckStatus] ', result)
+            return True
+        except Exception as ex:
+            print('  !! wsStatusCheck:', ex)
+            return False
+        finally:
+            if result is None: self.close()
+            shared.lastTime.statusCheck = monotonic()
+    def wsHeartbeatIfNeed(self, timeout=None):
+        return self.wsHeartbeat(timeout) if heartbeatShouldBeChecked() else True
     def wsHeartbeat(self, timeout=None):
         result = None
         try:
@@ -123,11 +153,8 @@ class BaseRawSocket:
             print('  !! wsHeartbeat:', ex)
             return False
         finally:
-            if result is None:
-                self.close()
+            if result is None: self.close()
             shared.lastTime.heartbeat = monotonic()
-    def wsHeartbeatIfNeed(self, timeout=None):
-        return self.wsHeartbeat(timeout) if heartbeatShouldBeChecked() else True
     def _encodeLine(self, data):
         # print('data-type', type(data), data)
         if isinstance(data, (dict, list)): data = json.dumps(data)

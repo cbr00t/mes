@@ -62,13 +62,11 @@ class WebReq(BaseWebReq):
 
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
-    def open(self):
-        if not super().open():
-            return self
-        eth = shared.dev.eth
-        pool = eth.getPool()
-        sock = self.sock = pool.socket(pool.AF_INET, pool.SOCK_STREAM)
+    def _open(self):
+        if not super()._open(): return self
         srv = self.server; ep = (ip2Str(srv.ip), srv.rawPort)
+        eth = shared.dev.eth; pool = eth.getPool()
+        sock = self.sock = pool.socket(pool.AF_INET, pool.SOCK_STREAM)
         try:
             sock.connect(ep)
             print('! sock_open', f'{ep[0]}:{ep[1]}')

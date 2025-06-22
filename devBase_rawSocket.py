@@ -15,6 +15,10 @@ class BaseRawSocket:
     def getDefaultTimeout(self):
         return srv.socketTimeout
     def open(self):
+        self._open(); connected = self.isConnected()
+        self.onOpen() if connected else self.onClose()
+        return connected
+    def _open(self):
         if not self.isConnected():
             busy(); srv = self.server
             print('! sock open:', f'{ip2Str(srv.ip)}:{srv.rawPort}')
@@ -24,7 +28,14 @@ class BaseRawSocket:
             try: busy(); self.sock.close()
             except: pass
             self.sock = None; print('! sock close')
+        self.onClose()
         return self
+    def onOpen(self):
+        dev = shared.dev; lcd = dev.lcd if dev else None
+        if lcd: lcd.write('^', 0, lcd.getCols() - 6)
+    def onClose(self):
+        dev = shared.dev; lcd = dev.lcd if dev else None
+        if lcd: lcd.write('x', 0, lcd.getCols() - 6)
     def send(self, data):
         if not self.isConnected(): return False
         buffer = self._encodeLine(data)

@@ -125,10 +125,10 @@ class Part(NS):
             cur.render()
         else: _clear = True
         if _clear:
-            from app_ovl01 import renderAppTitle
+            from app_ovl03 import updateMainScreen
             out = Part.stdout(); out.clear();
-            renderAppTitle()
             shared._appTitleRendered = shared._inActionsCheck = False
+            updateMainScreen()
         print('part stack len:', len(Part.stack()))
     def canClose(self):
         return True

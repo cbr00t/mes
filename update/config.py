@@ -7,7 +7,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 0, 17)
+    version                         = (1, 0, 20)
 )
 
 
@@ -30,9 +30,10 @@ server = NS(
     rawPort                         =  8199,
     updatePorts                     =  [2085, 80, 81],
     wsPath                          =  'ws/skyMES/makineDurum',
-    autoUpdate                      =  False,                              # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
+    autoUpdate                      =  None,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
-    hearbeatInterval                =  5,                                  # in secs. ( <= 0 Or None ) = no heartbeat
+    hearbeatInterval                =  0,                                  # in secs. ( <= 0 Or None ) = no heartbeat
+    statusCheckInterval             =  5,                                  # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
     socketTimeout                   =  0.5                                 # in secs. default value
 )
 
@@ -97,4 +98,3 @@ else:
 ## --------------------------------
     server.ip                       =  (192, 168, 1, 48)
   # server.ip                       =  (192, 168, 1, 200)
-

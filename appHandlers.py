@@ -118,4 +118,3 @@ class AppHandlers:
         handler = shared._onKeyReleased
         if handler is not None:
             handler(key, duration)
-

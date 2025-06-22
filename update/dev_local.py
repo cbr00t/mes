@@ -33,12 +33,10 @@ class WebReq(BaseWebReq):
 
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
-    def open(self):
-        if not super().open():
-            return self
-        srv = self.server
+    def _open(self):
+        if not super()._open(): return self
+        srv = self.server; ep = (ip2Str(srv.ip), srv.rawPort)
         sock = self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ep = (ip2Str(srv.ip), srv.rawPort)
         try:
             sock.connect(ep)
             print('! sock open', f'{ep[0]}:{ep[1]}')
@@ -72,8 +70,10 @@ class LCDCtl(BaseLCD):
         super().__init__()
         print('! lcd init')
     def write(self, data, row=0, col=0, _internal=False):
+        cur = self._buffer[row]; old = ''.join(cur[col : col + len(data)])
         result = super().write(data, row, col)
-        if not _internal: self._printBuffer()
+        if not (_internal or data == old):
+            self._printBuffer()
         return result
     def clearLine(self, row):
         result = super().clearLine(row)

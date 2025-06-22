@@ -25,7 +25,8 @@ def getMenuItems_main():
 def getMenu_duraksamaNedenleri():
     def defAction(self, *args, **kwargs):
         sock = shared.dev.sock
-        sock.wsTalk('baslatDurdur', { 'durNedenKod': self.id() })
+        if sock.wsTalk('baslatDurdur', { 'durNedenKod': self.id() }):
+            self.close()
     # def action_close(self, *args, **kwargs):
     #     self.close()
     recs = getDuraksamaNedenleri()
@@ -33,7 +34,7 @@ def getMenu_duraksamaNedenleri():
                 for rec in recs] if recs else None
     print('items:', items)
     if items: items.append(MenuItem(_text = 'CIKIS', _action = "self.close()"))
-    return SubMenu(_title = 'Duraksama Secimi', _items = items) if items else None
+    return SubMenu(_text = 'Duraksama Secimi', _items = items) if items else None
 def getDuraksamaNedenleri():
     cache = shared._globals; result = cache.duraksamaNedenleri
     if not result:
@@ -42,4 +43,3 @@ def getDuraksamaNedenleri():
         if isinstance(result, str): result = json.loads(result)
         cache.duraksamaNedenleri = result
     return result
- 

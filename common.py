@@ -208,5 +208,3 @@ def getWSData(api, args = None, data = None, wsPath = None):
     if data is not None: result['data'] = { 'data': data }
     # print('getwsdata', result)
     return result
-
-

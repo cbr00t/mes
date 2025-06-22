@@ -58,4 +58,3 @@ class MenuPart(Part):
     #     return None
 
 # p = MenuPart(_source = [ NS(text='item1') ]).source([ NS(id='i1', text='item2'), NS(id='i2', text='item3'), NS(text='item4') ]); p._inputs
-

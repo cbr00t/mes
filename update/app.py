@@ -3,6 +3,7 @@ from config import app, local, server as srv
 from update import *
 from app_ovl01 import *
 from app_ovl02 import *
+from app_ovl03 import *
 from time import sleep, monotonic
 import json
 import gc
@@ -31,20 +32,19 @@ def run():
 
 def loop():
     global cpuHaltTime
-    cpuHaltTime = 0.2 if isIdle() else 0.01; sleep(cpuHaltTime)
-    if not shared._appTitleRendered: renderAppTitle()
-    if lcd._lastWriteTime: lcd.clearLineIfReady(2)
+    cpuHaltTime = 0.2 if isIdle() else 0.05; sleep(cpuHaltTime)
+    # if not shared._appTitleRendered: renderAppTitle()
+    # if lcd._lastWriteTime: lcd.clearLineIfReady(2)
     lastGC = shared.lastTime.gc 
     if not lastGC or monotonic() - lastGC >= 2:
         gc.collect(); shared.lastTime.gc = monotonic()
-    keypad.update()
-    sock.wsHeartbeatIfNeed()
+    updateMainScreen(); sock.wsHeartbeatIfNeed()
     if connectToServerIfNot():
-        if not shared._updateCheckPerformed:
-            updateFiles()
-            lcd.clearIfReady(); renderAppTitle()
-    actionsCheckAndExec()
-    keypad.update()
+        if not shared._updateCheckPerformed: updateFiles()
+        sock.wsCheckStatusIfNeed()
+    updateMainScreen(); keypad.update()
+    keypad.update(); actionsCheckAndExec()
+    processQueues(); keypad.update()
 
 def initDevice():
     print('    init device')
@@ -66,7 +66,7 @@ def initHandlers():
     return h
 def updateSelf():
     lcd.clearLine(3); lcd.write('GUNCELLENIYOR...', 3, 2)
-    sleep(1)
+    sleep(0.5)
     srv.autoUpdate = True
     updateFiles()
     lcd.clearLine(3); lcd.write('REBOOTING...', 3, 2)

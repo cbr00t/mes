@@ -23,12 +23,10 @@ class BaseLCD:
         return [''.join(row) for row in buf] if asString else buf
     def readMatrix(self):
         return [row[:] for row in self._buffer]
-    def readBuffer(self):
-        return self._read(False)
     def readLines(self):
-        return '\n'.join(self.readLines())
+        return [''.join(line) for line in self._read(False)]
     def readString(self):
-        return self.readLines().join('\n')
+        return '\n'.join(self.readLines())
     def write(self, data, row=0, col=0, _internal=False):
         if not _internal: self._lastWriteTime = monotonic()
         rowCount = self.getRows()
@@ -38,6 +36,9 @@ class BaseLCD:
             if col + i < len(buf[row]):
                 buf[row][col + i] = ch
         return self
+    def writeLine(self, data, row=0, col=0, _internal=False):
+        self.clearLine(row)
+        return self.write(data, row, col, internal)
     def clearLine(self, row):
         if isinstance(row, range): row = range(row.start, row.stop + 1)
         if isinstance(row, (list, range)):
@@ -48,17 +49,33 @@ class BaseLCD:
         return self
     def clear(self):
         self._lastWriteTime = None
-        self._buffer = [['' for _ in range(len(row))] for row in self._buffer]
+        cols = self.getCols(); rows = self.getRows()
+        self._buffer = [['' for _ in range(cols)] for _ in range(rows)]
         return self
-    def writeIfReady(self, data, row=0, col=0,  _internal=False):
-        if not lcdIsBusy():
-            return self.write(data, row, col, _internal)
-    def clearLineIfReady(self, row):
-        if lcdCanBeCleared():
-            return self.clearLine(row)
+    def writeIfReady(self, data, row=0, col=0, _internal=False):
+        if lcdIsBusy(): return self
+        if not _internal:
+            cur = self._buffer[row]; old = ''.join(cur[col : col + len(data)])
+            if data == old: return self
+        return self.write(data, row, col, _internal)
+    def writeLineIfReady(self, data, row=0, col=0, _internal=False):
+        self.clearLineIfReady(row)
+        return self.writeIfReady(data, row, col, _internal)
+    def clearLineIfReady(self, row, _internal=False):
+        if lcdIsBusy(): return self
+        if isinstance(row, range): row = range(row.start, row.stop + 1)
+        if isinstance(row, (list, range)):
+            for _row in row: self.clearLineIfReady(_row)
+            return self
+        if not _internal:
+            if ''.join(self._buffer[row]).strip() == '': return self
+        return self.clearLine(row)
     def clearIfReady(self):
-        if lcdCanBeCleared():
-            return self.clear()
+        if lcdIsBusy(): return self
+        for r in range(self.getRows()):
+            self.clearLineIfReady(r)
+        return self
+        # return self.clear()
     def on(self):
         return self
     def off(self):
