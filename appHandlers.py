@@ -75,6 +75,10 @@ class AppHandlers:
         if not lcdIsBusy():
             self.dev.lcd.write(text, row, col, False)
         return self
+    def lcdWriteLine(self, text, row=0, col=0):
+        if not lcdIsBusy():
+            self.dev.lcd.writeLine(text, row, col, False)
+        return self
     def lcdClearLine(self, row):
         if not lcdIsBusy():
             self.dev.lcd.clearLine(row)

@@ -38,7 +38,7 @@ class BaseLCD:
         return self
     def writeLine(self, data, row=0, col=0, _internal=False):
         self.clearLine(row)
-        return self.write(data, row, col, internal)
+        return self.write(data, row, col, _internal)
     def clearLine(self, row):
         if isinstance(row, range): row = range(row.start, row.stop + 1)
         if isinstance(row, (list, range)):
