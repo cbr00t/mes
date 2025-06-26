@@ -61,7 +61,6 @@ def updateMainScreen():
         lcd.writeLineIfReady(f"D:{str_val('durumKod')}", 2, 0)
         lastTime.updateMainScreen = monotonic()
     return True
-
 def renderAppTitle():
     dev = shared.dev; lcd = dev.lcd; sock = dev.sock
     # lcd.clearLine(0)

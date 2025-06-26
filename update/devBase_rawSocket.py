@@ -32,10 +32,10 @@ class BaseRawSocket:
         return self
     def onOpen(self):
         dev = shared.dev; lcd = dev.lcd if dev else None
-        if lcd: lcd.write('^', 0, lcd.getCols() - 6)
+        if lcd: lcd.write('^', 0, lcd.getCols() - 2)
     def onClose(self):
         dev = shared.dev; lcd = dev.lcd if dev else None
-        if lcd: lcd.write('x', 0, lcd.getCols() - 6)
+        if lcd: lcd.write('x', 0, lcd.getCols() - 2)
     def send(self, data):
         if not self.isConnected(): return False
         buffer = self._encodeLine(data)

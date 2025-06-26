@@ -38,7 +38,7 @@ def loop():
     lastGC = shared.lastTime.gc 
     if not lastGC or monotonic() - lastGC >= 2:
         gc.collect(); shared.lastTime.gc = monotonic()
-    updateMainScreen(); sock.wsHeartbeatIfNeed()
+    updateMainScreen(); sock.wsHeartbeatIfNeed();
     if connectToServerIfNot():
         if not shared._updateCheckPerformed: updateFiles()
         sock.wsCheckStatusIfNeed()
