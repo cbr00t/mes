@@ -7,7 +7,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 22)
+    version                         = (1, 0, 23)
 )
 
 
@@ -28,12 +28,12 @@ local = NS(
 server = NS(
     wsPort                          =  8200,
     rawPort                         =  8199,
-    updatePorts                     =  [2085, 81],
+    updatePorts                     =  [80, 2085],
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  None,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
     hearbeatInterval                =  0,                                  # in secs. ( <= 0 Or None ) = no heartbeat
-    statusCheckInterval             =  1,                                  # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
+    statusCheckInterval             =  2,                                  # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
     socketTimeout                   =  0.5                                 # in secs. default value
 )
 
@@ -51,10 +51,10 @@ hw = NS(
         rows = ['GP12', 'GP13', 'GP14', 'GP15'],
         cols = ['GP7', 'GP8', 'GP9', 'GP10', 'GP11'],
         keys = [
-            ['F1', '1', '2', '3', 'X'],
-            ['F2', '4', '5', '6', 'up'],
-            ['F3', '7', '8', '9', 'down'],
-            ['F4', 'ESC', '0', 'ENTER', None]
+            ['f1', '1', '2', '3', 'X'],
+            ['f2', '4', '5', '6', 'up'],
+            ['f3', '7', '8', '9', 'down'],
+            ['f4', 'esc', '0', 'enter', None]
         ]
     ),
     lcd = NS(

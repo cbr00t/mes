@@ -131,7 +131,8 @@ class BaseRawSocket:
             result = self.wsTalk('tekilTezgahBilgi')
             if not result: raise RuntimeError('check failed')
             if isinstance(result, str): result = json.loads(result)
-            if result: shared.curStatus = result
+            if result is not None:
+                shared.curStatus = result
             # print('[wsCheckStatus] ', result)
             return True
         except Exception as ex:

@@ -24,7 +24,7 @@ def actionsCheck():
         print('awaiting remote command')
         shared._inActionsCheck = True
     resp = targetIP = actions = None
-    timeout = 0.5 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 1 else 0.05
+    timeout = 0.05 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 3 else 0.2
     try: resp = sock.wsRecv(timeout)
     except (OSError, RuntimeError) as ex: resp = None
     except Exception as ex: print('[ERROR]', 'APP sockRecv:', ex); print_exception(ex)

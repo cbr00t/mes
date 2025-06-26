@@ -15,7 +15,6 @@ def updateFiles():
     if autoUpdate is None: autoUpdate = False
     if not (autoUpdate and urls):
         return False
-    
     if not lcdIsBusy():
         lcd.clearLine(range(1, 3)); lcd.write('UPDATE CHECK', 1, 1)
     url = None; lastError = None

@@ -102,7 +102,6 @@ def safeImport(name, as_ = None):
 def isWindows():
     import os
     return os.name == 'nt'       # Windows
-
 def isCircuitPy():
     try:
         from sys import implementation as impl

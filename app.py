@@ -35,15 +35,16 @@ def loop():
     cpuHaltTime = 0.2 if isIdle() else 0.05; sleep(cpuHaltTime)
     # if not shared._appTitleRendered: renderAppTitle()
     # if lcd._lastWriteTime: lcd.clearLineIfReady(2)
-    lastGC = shared.lastTime.gc 
+    lastGC = shared.lastTime.gc
     if not lastGC or monotonic() - lastGC >= 2:
         gc.collect(); shared.lastTime.gc = monotonic()
-    updateMainScreen(); sock.wsHeartbeatIfNeed();
+    updateMainScreen(); sock.wsHeartbeatIfNeed(); keypad.update();
     if connectToServerIfNot():
         if not shared._updateCheckPerformed: updateFiles()
         sock.wsCheckStatusIfNeed()
+    actionsCheckAndExec(); keypad.update()
     updateMainScreen(); keypad.update()
-    keypad.update(); actionsCheckAndExec()
+    actionsCheckAndExec(); keypad.update()
     processQueues(); keypad.update()
 
 def initDevice():

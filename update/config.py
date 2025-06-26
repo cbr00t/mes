@@ -28,7 +28,7 @@ local = NS(
 server = NS(
     wsPort                          =  8200,
     rawPort                         =  8199,
-    updatePorts                     =  [2085, 81],
+    updatePorts                     =  [2085, 80],
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  None,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
@@ -51,10 +51,10 @@ hw = NS(
         rows = ['GP12', 'GP13', 'GP14', 'GP15'],
         cols = ['GP7', 'GP8', 'GP9', 'GP10', 'GP11'],
         keys = [
-            ['F1', '1', '2', '3', 'X'],
-            ['F2', '4', '5', '6', 'up'],
-            ['F3', '7', '8', '9', 'down'],
-            ['F4', 'ESC', '0', 'ENTER', None]
+            ['f1', '1', '2', '3', 'X'],
+            ['f2', '4', '5', '6', 'up'],
+            ['f3', '7', '8', '9', 'down'],
+            ['f4', 'esc', '0', 'enter', None]
         ]
     ),
     lcd = NS(
