@@ -1,23 +1,22 @@
-### part.py
 from common import *
-from part_base import  *
+from config import local
+from part_base import *
+from menu import *
 
-class MenuPart(Part):
+class InfoPart(Part):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.source(self._source or [], defer=True)
-    def editable(self):
-        return True
+        self.source(self._source or self.defaultSource(), defer=True)
+    def defaultSource(self):
+        return None
     def source(self, value=None, defer=False):
-        from menu import Menu, SubMenu
         # get
         if value is None:
             result = self._source
-            _args = []; _kwargs = {}
             if isinstance(result, tuple):
                 result, *_res = result
-                if len(_res) >= 1: _args = _rest[0]
-                if len(_res) == 2: _kwargs = _rest[1]
+                if len(_res) >= 1: _args = _res[0]
+                if len(_res) == 2: _kwargs = _res[1]
             if isinstance(result, str):
                 h = shared.handlers
                 result = getattr(h, result, None)
@@ -34,7 +33,8 @@ class MenuPart(Part):
         _source = self._source = _source or []
         _lastId = self._lastId or 0
         if isinstance(_source, Menu): _source.parentPart(self)
-        for item in _source:
+        for _item in _source:
+            item = NS(text = _item) if isinstance(_item, str) else _item
             text = item.get('text') if isinstance(item, dict) else item.text
             # if not text: continue
             id = item.get('id') if isinstance(item, dict) else item.id
@@ -47,14 +47,16 @@ class MenuPart(Part):
             self.addInput(id, item)
         self.onAttrChanged()
         return self
-    # def onKeyPressed_araIslem(self, key, _key, duration=None):
-    #     result = super().onKeyPressed_araIslem(key, _key, duration)
-    #     if result is not None: return result
-    #     if _key == 'enter':
-    #         item = self.curInput()
-    #         if not item: return None
-    #         item.run()
-    #         return True
-    #     return None
 
-# p = MenuPart(_source = [ NS(text='item1') ]).source([ NS(id='i1', text='item2'), NS(id='i2', text='item3'), NS(text='item4') ]); p._inputs
+class DeviceInfoPart(InfoPart):
+    def title(self):
+        # get
+        return 'CIHAZ BILGISI'
+    def defaultSource(self):
+        from config import local, server as srv, app
+        return [
+            f'Ver :{version2Str(app.version)}',
+            f'D.IP:{ip2Str(local.ip)}',
+            f'S.IP:{ip2Str(srv.ip)}',
+            f'Port:{srv.rawPort}'
+        ]

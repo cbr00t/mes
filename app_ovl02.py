@@ -1,6 +1,7 @@
 from common import *
 from config import local
 from menu import SubMenu, MenuItem
+from app_infoPart import *
 from app_menus import *
 from app_ovl03 import *
 from time import sleep, monotonic
@@ -80,7 +81,9 @@ def onKeyReleased_defaultAction(key, duration):
     lastTime = shared.lastTime._keySend = monotonic()
     # if key == '0':
     #    getMenu('main').run()
-    if key == '3':
+    if key == 'f1':
+        DeviceInfoPart().run()
+    elif key == 'f2':
         mnu = getMenu_duraksamaNedenleri()
         if mnu: mnu.run()
     # elif key == 'x':

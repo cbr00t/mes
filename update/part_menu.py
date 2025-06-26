@@ -15,9 +15,9 @@ class MenuPart(Part):
             result = self._source
             _args = []; _kwargs = {}
             if isinstance(result, tuple):
-                result, *_rest = result
-                if len(_rest) >= 1: _args = _rest[0]
-                if len(_rest) == 2: _kwargs = _rest[1]
+                result, *_res = result
+                if len(_res) >= 1: _args = _rest[0]
+                if len(_res) == 2: _kwargs = _rest[1]
             if isinstance(result, str):
                 h = shared.handlers
                 result = getattr(h, result, None)
@@ -43,7 +43,7 @@ class MenuPart(Part):
                 if isinstance(item, dict): item['id'] = id
                 else: item.id = id
             if hasattr(item, 'parentPart') and callable(item.parentPart): item.parentPart(self)
-            else: setattr(item, '_parentPart', self)
+            else: setattr(item, 'parentPart', self)
             self.addInput(id, item)
         self.onAttrChanged()
         return self

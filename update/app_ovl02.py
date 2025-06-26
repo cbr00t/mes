@@ -1,6 +1,7 @@
 from common import *
 from config import local
 from menu import SubMenu, MenuItem
+from app_infoPart import *
 from app_menus import *
 from app_ovl03 import *
 from time import sleep, monotonic
@@ -24,7 +25,7 @@ def actionsCheck():
         print('awaiting remote command')
         shared._inActionsCheck = True
     resp = targetIP = actions = None
-    timeout = 0.5 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 1 else 0.05
+    timeout = 0.05 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 3 else 0.2
     try: resp = sock.wsRecv(timeout)
     except (OSError, RuntimeError) as ex: resp = None
     except Exception as ex: print('[ERROR]', 'APP sockRecv:', ex); print_exception(ex)
@@ -80,7 +81,9 @@ def onKeyReleased_defaultAction(key, duration):
     lastTime = shared.lastTime._keySend = monotonic()
     # if key == '0':
     #    getMenu('main').run()
-    if key == '3':
+    if key == 'f1':
+        DeviceInfoPart().run()
+    elif key == 'f2':
         mnu = getMenu_duraksamaNedenleri()
         if mnu: mnu.run()
     # elif key == 'x':

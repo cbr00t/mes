@@ -184,8 +184,10 @@ class Part(NS):
         start = self.scrollPos(); end = min(start + rows, count)
         for r, i in enumerate(range(start, end), start=1):
             item = self.getInput(i)
-            label = item.label() if hasattr(item, 'label') else None
-            text = item.text() if hasattr(item, 'text') else ''
+            label = item.get('label') if isinstance(item, dict) else item.label if hasattr(item, 'label') else None
+            if callable(label): label = label()
+            text = item.get('text') if isinstance(item, dict) else item.text if hasattr(item, 'text') else None
+            if callable(text): label = text() or ''
             data = '> ' if cur == i else '  '
             if label: data += label
             data += text
@@ -226,14 +228,14 @@ class Part(NS):
     def getInput(self, keyOrIndex):
         if keyOrIndex is None: return None
         _inputs = self.inputs()
-        if isinstance(keyOrIndex, int): return _inputs[keyOrIndex][1] # by-index
-        elif isinstance(keyOrIndex, tuple): return keyOrIndex[1]      # by-ref
+        if isinstance(keyOrIndex, int): return _inputs[keyOrIndex][1]                  # by-index
+        elif isinstance(keyOrIndex, tuple): return keyOrIndex[1]                       # by-ref
         # by-key
         for name, item in _inputs:
             if name == keyOrIndex: return item
         return None
     def _adjustScroll(self):
-        maxRows = self.stdout().getRows() - 1    # başlık harici satır sayısı
+        maxRows = self.stdout().getRows() - 1                                          # başlık harici satır sayısı
         cur = self._curInputInd
         if cur < self._scrollPos: self._scrollPos = cur
         elif cur >= self._scrollPos + maxRows: self._scrollPos = cur - maxRows + 1

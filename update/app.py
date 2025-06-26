@@ -38,10 +38,11 @@ def loop():
     lastGC = shared.lastTime.gc
     if not lastGC or monotonic() - lastGC >= 2:
         gc.collect(); shared.lastTime.gc = monotonic()
-    updateMainScreen(); sock.wsHeartbeatIfNeed();
+    updateMainScreen(); sock.wsHeartbeatIfNeed(); keypad.update();
     if connectToServerIfNot():
         if not shared._updateCheckPerformed: updateFiles()
         sock.wsCheckStatusIfNeed()
+    actionsCheckAndExec(); keypad.update()
     updateMainScreen(); keypad.update()
     actionsCheckAndExec(); keypad.update()
     processQueues(); keypad.update()
