@@ -9,7 +9,7 @@ def ethWait():
 def ethCheck():
     dev = shared.dev; eth = dev.eth; lcd = dev.lcd; lastTime = shared.lastTime
     if eth.isConnected(): lastTime.ethCheckMsg = None; return True
-    if not lcdIsBusy() and (not lastTime.ethCheckMsg or monotonic() - lastTime.ethCheckMsg >= 2):
+    if not lcdIsBusy() and (not lastTime.ethCheckMsg or monotonic() - lastTime.ethCheckMsg >= 5):
         # lcd.clearLineIfReady(range(1, 3))
         lcd.writeLineIfReady('Ethernet bekleniyor...', 1, 0)
         lastTime.ethCheckMsg = monotonic()

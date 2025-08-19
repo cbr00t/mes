@@ -40,15 +40,16 @@ def loop():
     if not lastGC or monotonic() - lastGC >= 2:
         gc.collect(); shared.lastTime.gc = monotonic()
     updateMainScreen(); sock.wsHeartbeatIfNeed(); keypad.update();
-    if connectToServerIfNot():
-        if not shared._updateCheckPerformed: updateFiles()
-        sock.wsCheckStatusIfNeed()
-    elif not ethCheck():
-        return
-    actionsCheckAndExec(); keypad.update()
-    updateMainScreen(); keypad.update()
-    actionsCheckAndExec(); keypad.update()
-    processQueues(); keypad.update()
+    if ethCheck():
+        if connectToServerIfNot():
+            if not shared._updateCheckPerformed: updateFiles()
+            sock.wsCheckStatusIfNeed()
+        actionsCheckAndExec(); keypad.update()
+        updateMainScreen(); keypad.update()
+        actionsCheckAndExec(); keypad.update()
+        processQueues(); keypad.update()
+    else:
+        updateMainScreen(); keypad.update()
 
 def initDevice():
     print('    init device')
@@ -70,8 +71,10 @@ def initHandlers():
     return h
 def updateSelf():
     lcd.clearLine(3); lcd.write('GUNCELLENIYOR...', 3, 2)
-    sleep(0.5)
-    srv.autoUpdate = True
-    updateFiles()
+    sleep(0.5); srv.autoUpdate = True
+    updateFiles(); reboot()
+def reboot():
+    import microcontroller
+    print('rebooting...')
     lcd.clearLine(3); lcd.write('REBOOTING...', 3, 2)
-    h.reboot()
+    sleep(.5); microcontroller.reset()

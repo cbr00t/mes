@@ -1,7 +1,7 @@
 ### devBase.py (Ortak Modül)
 
 class BaseLED:
-    def write(self, rgb, col):
+    def write(self, rgb):
         return self
-    def clear(self, col):
-        return self.write((0, 0, 0), col)
+    def clear(self):
+        return self.write((0, 0, 0))
