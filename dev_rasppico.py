@@ -32,17 +32,21 @@ class Eth(BaseEth):
         if cs is None: cs = self._cs = digitalio.DigitalInOut(board.GP17) if 'digitalio' in globals() else None
         if spi is None: spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16) if 'busio' in globals() else None
         if reset is None: reset = self._reset = digitalio.DigitalInOut(board.GP20) if 'digitalio' in globals() else None
-        eth = self.eth = WIZNET5K(spi, cs, reset, is_dhcp=is_dhcp) if 'WIZNET5K' in globals() else self
-        if not is_dhcp: eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
+        try:
+            eth = self.eth = WIZNET5K(spi, cs, reset, is_dhcp=is_dhcp) if 'WIZNET5K' in globals() else self
+            if not is_dhcp: eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)
+        except RuntimeError as e:
+            print("Ethernet başlatılamadı:", e)
+            eth = self.eth = None
         return self
     def isConnected(self):
-        return self.eth.link_status
+        eth = self.eth
+        if eth is None: self.init(); eth = self.eth
+        return False if eth is None else eth.link_status
     def getPool(self):
         pool = self.pool
-        if pool is not None:
-            return pool
-        if not ('adafruit_connection_manager' in globals() and self.isConnected()):
-            return None
+        if pool is not None: return pool
+        if not ('adafruit_connection_manager' in globals() and self.isConnected()): return None
         pool = self.pool = adafruit_connection_manager.get_radio_socketpool(self.eth)
         return pool
 

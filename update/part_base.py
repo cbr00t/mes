@@ -177,7 +177,7 @@ class Part(NS):
     def _render_ilk(self):
         self.out_clear()
         # print('title:', self.title())
-        self.out_write(self.title() or '', 0, 0)
+        self.out_write(self.title() or '', 0, 1)
     def _renderInputs(self):
         count = len(self.inputs()); cur = self.curInputInd()
         rows = self.stdout().getRows() - 1    # başlık harici satır sayısı
@@ -187,10 +187,10 @@ class Part(NS):
             label = item.get('label') if isinstance(item, dict) else item.label if hasattr(item, 'label') else None
             if callable(label): label = label()
             text = item.get('text') if isinstance(item, dict) else item.text if hasattr(item, 'text') else None
-            if callable(text): label = text() or ''
+            if callable(text): text = text() or ''
             data = '> ' if cur == i else '  '
             if label: data += label
-            data += text
+            if text: data += text
             # print('_renderInputs:', r, i, text)
             self.out_write(data, r, 0)
     def _render_son(self):
