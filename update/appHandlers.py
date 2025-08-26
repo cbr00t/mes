@@ -20,9 +20,8 @@ class AppHandlers:
         result = exec(code, globals())
         return result
     def reboot(self):
-        import microcontroller
-        print('rebooting...')
-        microcontroller.reset()
+        import app
+        app.reboot()
         return self
     def updateSelf(self):
         import app
@@ -87,8 +86,8 @@ class AppHandlers:
         if not lcdIsBusy():
             self.dev.lcd.clear()
         return self
-    def ledWrite(self, rgb, col=0):
-        self.dev.led.write(rgb, col)
+    def ledWrite(self, rgb):
+        self.dev.led.write(rgb)
         return self
     def ledClear(self):
         self.dev.led.clear()

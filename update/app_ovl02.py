@@ -86,6 +86,11 @@ def onKeyReleased_defaultAction(key, duration):
     elif key == 'f2':
         mnu = getMenu_duraksamaNedenleri()
         if mnu: mnu.run()
+    elif key == 'esc' and duration >= 2:
+        from app import updateSelf, reboot
+        reboot()
+        # if sock.isConnected(): updateSelf()
+        # else: reboot()
     # elif key == 'x':
     #    from part_input import InputPart
     #    InputPart(_title = 'Input Test', _val = 'cik').run()

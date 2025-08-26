@@ -128,8 +128,11 @@ class BaseRawSocket:
     def wsCheckStatus(self, timeout=None):
         result = None
         try:
-            result = self.wsTalk('tekilTezgahBilgi')
-            if not result: raise RuntimeError('check failed')
+            for i in range(0, 3):
+                if result is not None: break
+                result = self.wsTalk('tekilTezgahBilgi')
+            if not result:
+                raise RuntimeError('check failed')
             if isinstance(result, str): result = json.loads(result)
             if result is not None:
                 shared.curStatus = result
@@ -146,8 +149,11 @@ class BaseRawSocket:
     def wsHeartbeat(self, timeout=None):
         result = None
         try:
-            result = self.wsTalk('ping')
-            if not result: raise RuntimeError('check failed')
+            for i in range(0, 3):
+                if result is not None: break
+                result = self.wsTalk('ping')
+            if not result:
+                raise RuntimeError('check failed')
             # print('[wsHeartbeat] ', result)
             return True
         except Exception as ex:
