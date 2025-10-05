@@ -2,13 +2,9 @@
 from common import *
 from config import server as srv, hw
 from devBase import *
-from time import sleep
-import json
 import socket
 import requests
-from sys import stdin
-from os import system
-import keyboard
+# import keyboard
 
 # ---------- Ethernet Class (Mock) ----------
 class Eth(BaseEth):
@@ -52,7 +48,8 @@ class Keypad(BaseKeypad):
         print('! keypad init')
     def update(self):
         super().update();
-        if keyboard.is_pressed('enter'):
+        # if keyboard.is_pressed('enter'):
+        if False:
             key = input('  > ')
             onPressed = self.onPressed; onReleased = self.onReleased
             self._lastKeyPressTime = monotonic()
@@ -92,7 +89,8 @@ class LCDCtl(BaseLCD):
         print('! lcd off')
         return self
     def _printBuffer(self):
-        system('cls'); print('\n')  # print('\033[2J')
+        # system('cls')
+        print('\n')  # print('\033[2J')
         return super()._printBuffer()
 
 class LEDCtl(BaseLED):

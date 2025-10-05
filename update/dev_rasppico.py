@@ -25,13 +25,24 @@ class Eth(BaseEth):
         super().__init__()
         self.pool = self._spi = self._cs = self._reset = None
     def init(self):
+        ec = hw.eth
         is_dhcp = not local.ip
         spi = self._spi; cs = self._cs;
         reset = self._reset; eth = self.eth
+        # getattr(board, pin)
         # if spi is not None: spi.deinit(); spi = None
-        if cs is None: cs = self._cs = digitalio.DigitalInOut(board.GP17) if 'digitalio' in globals() else None
-        if spi is None: spi = self._spi = busio.SPI(board.GP18, board.GP19, board.GP16) if 'busio' in globals() else None
-        if reset is None: reset = self._reset = digitalio.DigitalInOut(board.GP20) if 'digitalio' in globals() else None
+        if cs is None:
+            cs = self._cs = digitalio.DigitalInOut(getattr(board, ec.cs)) \
+                if 'digitalio' in globals() else None
+        if spi is None:
+            spi = self._spi = busio.SPI(\
+                    getattr(board, ec.spi[0]), \
+                    getattr(board, ec.spi[1]), \
+                    getattr(board, ec.spi[2]) \
+                ) if 'busio' in globals() else None
+        if reset is None:
+            reset = self._reset = digitalio.DigitalInOut(getattr(board, ec.reset)) \
+                if 'digitalio' in globals() else None
         try:
             eth = self.eth = WIZNET5K(spi, cs, reset, is_dhcp=is_dhcp) if 'WIZNET5K' in globals() else self
             if not is_dhcp: eth.ifconfig = (local.ip, local.subnet, local.gateway, local.dns)

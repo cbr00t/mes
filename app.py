@@ -4,59 +4,58 @@ from update import *
 from app_ovl01 import *
 from app_ovl02 import *
 from app_ovl03 import *
-from time import sleep, monotonic
-import json
-import gc
-from traceback import print_exception
 
-def init():
-    global localIP, srvIP, srvPort, dev, eth, sock, lcd, keypad, h
+async def init():
+    global localIP, srvIP, srvPort, dev, wifi, sock, lcd, keypad, h
     localIP = ip2Str(local.ip); srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
     print(f'localIP: [{localIP}] | server rawSocket: [{srvIP}:{srvPort}]')
     dev = initDevice(); h = initHandlers()
-    eth = dev.eth; lcd = dev.lcd; sock = dev.sock; keypad = dev.keypad
-    shared._onKeyPressed = onKeyPressed; shared._onKeyReleased = onKeyReleased
+    wifi = dev.wifi; lcd = dev.lcd; sock = dev.sock; keypad = dev.keypad
+    shared._onKeyPressed = onKeyPressed
+    shared._onKeyReleased = onKeyReleased
+    asyncio.create_task(keypad.loop())
 
-def run():
+async def run():
+    # wifi.connect()
     lcd.off(); lcd.on()
     lcd.clearIfReady(); sock.close()
     print('app started')
     while True:
         try:
-            loop()
+            await loop()
         except Exception as ex:
             print('[ERROR]', 'APP LOOP:', ex)
             print_exception(ex)
     lcd.clear(); lcd.write('SHUTDOWN', 1,1)
     sock.close()
 
-def loop():
+async def loop():
     global cpuHaltTime
-    cpuHaltTime = 0.2 if isIdle() else 0.05; sleep(cpuHaltTime)
+    cpuHaltTime = 3 if isIdle() else 1; await asleep(cpuHaltTime)
     # if not shared._appTitleRendered: renderAppTitle()
     # if lcd._lastWriteTime: lcd.clearLineIfReady(2)
-
+    
     lastGC = shared.lastTime.gc
     if not lastGC or monotonic() - lastGC >= 2:
         gc.collect(); shared.lastTime.gc = monotonic()
-    updateMainScreen(); sock.wsHeartbeatIfNeed(); keypad.update();
-    if ethCheck():
-        if connectToServerIfNot():
+    updateMainScreen(); await sock.wsHeartbeatIfNeed()
+    if await wifiCheck():
+        if await connectToServerIfNot():
             if not shared._updateCheckPerformed: updateFiles()
-            sock.wsCheckStatusIfNeed()
-        actionsCheckAndExec(); keypad.update()
-        updateMainScreen(); keypad.update()
-        actionsCheckAndExec(); keypad.update()
-        processQueues(); keypad.update()
+            await sock.wsCheckStatusIfNeed()
+        await actionsCheckAndExec()
+        updateMainScreen()
+        await actionsCheckAndExec()
+        await processQueues()
     else:
-        updateMainScreen(); keypad.update()
+        updateMainScreen()
 
 def initDevice():
     print('    init device')
     dev = shared.dev
     if dev is None:
         from config import mod
-        modName_device = mod.device or ('rasppico' if isCircuitPy() else 'local')
+        modName_device = mod.device or ('local' if isLocalPy() else 'rasppico')
         print(f'Device Module = {modName_device}')
         dynImport(f'dev_{modName_device}', 'mod_dev')
         print(f'    import dev_{modName_device} as mod_dev')
@@ -74,7 +73,7 @@ def updateSelf():
     sleep(0.5); srv.autoUpdate = True
     updateFiles(); reboot()
 def reboot():
-    import microcontroller
+    import machine
     print('rebooting...')
     lcd.clearLine(3); lcd.write('REBOOTING...', 3, 2)
-    sleep(.5); microcontroller.reset()
+    sleep(.5); machine.reset()

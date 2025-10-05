@@ -1,9 +1,6 @@
 from common import *
 from config import local, server as srv, hw
-from time import sleep, monotonic
 from os import rename, remove
-import json
-import gc
 
 def updateFiles():
     global dev, lcd, sock

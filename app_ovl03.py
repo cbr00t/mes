@@ -1,8 +1,5 @@
 from common import *
 from config import local, app
-from time import sleep, monotonic
-import json
-from traceback import print_exception
 
 def keyQueue_add(item):
     queues = shared.queues; keyQueue = queues.key = queues.key or []
@@ -15,7 +12,7 @@ def keyQueue_pop(item):
 def keyQueue_clear():
     queues = shared.queues; keyQueue = queues.key = queues.key or []
     if keyQueue: keyQueue.clear()
-def processQueues():
+async def processQueues():
     dev = shared.dev; lcd = dev.lcd; sock = dev.sock
     queues = shared.queues; keyQueue = queues.key = queues.key or []
     lcdRows = range(2, 3)
@@ -25,7 +22,7 @@ def processQueues():
             if ts:
                 item['tsDiff'] = round((monotonic() - ts) * 1000)
                 item.pop('ts', None)
-        result = sock.wsTalk('fnIslemi', None, keyQueue)
+        result = await sock.wsTalk('fnIslemi', None, keyQueue)
         debug_result = json.dumps(result) if result else '*empty*'
         print(f'    [processQueue] - [fnIslemi] - result: {debug_result})')
         if isinstance(result, dict) and bool(result.get('isError')) == False:

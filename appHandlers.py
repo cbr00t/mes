@@ -1,9 +1,6 @@
 from common import *
 from config import local, server as srv
 from part import *
-from time import sleep, monotonic
-import json
-from traceback import print_exception
 
 class AppHandlers:
     def __init__(self):
@@ -112,12 +109,13 @@ class AppHandlers:
         return heartbeatShouldBeChecked()
     
     ## Event Handlers
-    def keypad_onPressed(self, key):
+    async def keypad_onPressed(self, key):
         print(f'key_press: [{key}]')
         handler = shared._onKeyPressed
-        if handler is not None: handler(key)
-    def keypad_onReleased(self, key, duration):
+        if handler is not None:
+            await handler(key)
+    async def keypad_onReleased(self, key, duration):
         print(f'key_release: [{key}:{duration}]')
         handler = shared._onKeyReleased
         if handler is not None:
-            handler(key, duration)
+            await handler(key, duration)

@@ -1,9 +1,6 @@
 from common import *
 from config import local
 from menu import SubMenu, MenuItem
-from time import sleep, monotonic
-import json
-from traceback import print_exception
 
 def getMenu_main():
     items = getMenuItems_main()

@@ -4,14 +4,11 @@ from menu import SubMenu, MenuItem
 from app_infoPart import *
 from app_menus import *
 from app_ovl03 import *
-from time import sleep, monotonic
-import json
-from traceback import print_exception
 
-def actionsCheckAndExec():
-    actions = actionsCheck()
-    return actionsExec(actions) if actions else False
-def actionsCheck():
+async def actionsCheckAndExec():
+    actions = await actionsCheck()
+    return await actionsExec(actions) if actions else False
+async def actionsCheck():
     dev = shared.dev; lcd = dev.lcd; sock = dev.sock
     localIP = ip2Str(local.ip)
     # print(f'    connected = {connected} | shared._inActionsCheck = {shared._inActionsCheck}')
@@ -26,7 +23,7 @@ def actionsCheck():
         shared._inActionsCheck = True
     resp = targetIP = actions = None
     timeout = 0.05 if shared.lastTime._keySend and monotonic() - shared.lastTime._keySend < 3 else 0.2
-    try: resp = sock.wsRecv(timeout)
+    try: resp = await sock.wsRecv(timeout)
     except (OSError, RuntimeError) as ex: resp = None
     except Exception as ex: print('[ERROR]', 'APP sockRecv:', ex); print_exception(ex)
     if not resp: return None
@@ -38,7 +35,7 @@ def actionsCheck():
         print(f'[IGNORE] broadcast message => targetIP: [{targetIP} | localIP: [{localIP}]')
         actions = None
     return actions
-def actionsExec(actions):
+async def actionsExec(actions):
     if not actions: return False
     print('  actions=', actions)
     dev = shared.dev; lcd = dev.lcd; h = shared.handlers
@@ -53,27 +50,30 @@ def actionsExec(actions):
         args = item['args'] if 'args' in item else []
         print('<<     action args:', args)
         try:
-            sleep(0.01); busy()
+            await asleep(0.01); busy()
             handler(*args)                                                                                     # ← [js]  handler.call(this, ...args) karşılığı
         except Exception as ex:
             print(f'[ERROR]  handler execution failed: {ex}')
-            # sock.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
+            # await sock.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
     return True
 
 
 def onKeyPressed(key):
     part = activePart()
-    return part.onKeyPressed(key) if part else onKeyPressed_defaultAction(key)
+    return part.onKeyPressed(key) if part else await onKeyPressed_defaultAction(key)
 def onKeyReleased(key, duration):
     part = activePart()
-    return part.onKeyReleased(key, duration) if part else onKeyReleased_defaultAction(key, duration)
+    return part.onKeyReleased(key, duration) if part else await onKeyReleased_defaultAction(key, duration)
 
-def onKeyPressed_defaultAction(key):
+async def onKeyPressed_defaultAction(key):
+    print(f'{key} press')
     return True
-def onKeyReleased_defaultAction(key, duration):
+async def onKeyReleased_defaultAction(key, duration):
+    print(f'1 {key} released | duration = {duration}')
     dev = shared.dev; lcd = dev.lcd; sock = dev.sock; keypad = dev.keypad
     lastTime = shared.lastTime._keySend; key = key.lower()
-    if lastTime and monotonic() - lastTime <= 0.8: return False
+    print(f'2 {key} released | duration = {duration}')
+    if lastTime and ticks_diff(monotonic(), lastTime) <= 0.3: return False
     lastTime = keypad._lastKeyPressTime; delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
     lcdRows = range(2, 3)
     # lcd.clearLineIfReady(lcdRows)
@@ -97,11 +97,11 @@ def onKeyReleased_defaultAction(key, duration):
     else:
         _id = 'secondary' if key == 'enter' else key
         try:
-            processQueues()
-            if not sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': duration }):
+            await processQueues()
+            if not await sock.wsTalk('fnIslemi', { 'id': _id, 'delayMS': duration }):
                 raise RuntimeError()
             # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
-            sleep(0.1); lcd.clearLineIfReady(lcd.getRows() - 1) 
+            await asleep(0.1); lcd.clearLineIfReady(lcd.getRows() - 1) 
         except Exception as ex:
             # lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
             print_exception(ex)

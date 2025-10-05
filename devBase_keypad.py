@@ -1,7 +1,7 @@
 ### devBase.py (Ortak Modül)
 
 class BaseKeypad:
-    def __init__(self, onPressed = None, onReleased = None):
+    def __init__(self, onPressed=None, onReleased=None):
         self._lastKeyPressTime = self._lastKeyReleaseTime = None
         self.onPressed = onPressed; self.onReleased = onReleased
         pass

@@ -7,7 +7,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 29)
+    version                         = (1, 0, 30)
 )
 
 
@@ -47,10 +47,15 @@ mod = NS(
 ## Hardware Ayarları
 ## --------------------------------
 hw = NS(
+    eth = NS(
+        cs    = 'GP17',
+        spi   = ['GP18', 'GP19', 'GP16'],
+        reset = 'GP20'
+    ),
     keypad = NS(
-        rows = ['GP12', 'GP13', 'GP14', 'GP15'],
-        cols = ['GP7', 'GP8', 'GP9', 'GP10', 'GP11'],
-        keys = [
+        rows  = ['GP12', 'GP13', 'GP14', 'GP15'],
+        cols  = ['GP7', 'GP8', 'GP9', 'GP10', 'GP11'],
+        keys  = [
             ['f1', '1', '2', '3', 'X'],
             ['f2', '4', '5', '6', 'up'],
             ['f3', '7', '8', '9', 'down'],

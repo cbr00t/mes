@@ -1,9 +1,6 @@
 ### devBase.py (Ortak Modül)
 from common import *
 from config import server as srv
-from time import sleep, monotonic
-import json
-from traceback import print_exception
 
 class BaseRawSocket:
     def __init__(self):
@@ -14,11 +11,11 @@ class BaseRawSocket:
     @classmethod
     def getDefaultTimeout(self):
         return srv.socketTimeout
-    def open(self):
-        self._open(); connected = self.isConnected()
+    async def open(self):
+        await self._open(); connected = self.isConnected()
         self.onOpen() if connected else self.onClose()
         return connected
-    def _open(self):
+    async def _open(self):
         if not self.isConnected():
             busy(); srv = self.server
             print('! sock open:', f'{ip2Str(srv.ip)}:{srv.rawPort}')
@@ -36,7 +33,7 @@ class BaseRawSocket:
     def onClose(self):
         dev = shared.dev; lcd = dev.lcd if dev else None
         if lcd: lcd.write('x', 0, lcd.getCols() - 2)
-    def send(self, data):
+    async def send(self, data):
         if not self.isConnected(): return False
         buffer = self._encodeLine(data)
         sock = self.sock; totalSize = 0
@@ -55,7 +52,7 @@ class BaseRawSocket:
             return False
         shared.lastTime.heartbeat = monotonic()
         return True
-    def recv(self, timeout=None):
+    async def recv(self, timeout=None):
         if not self.isConnected(): return None
         sock = self.sock; buffer = b''
         try:
@@ -74,19 +71,26 @@ class BaseRawSocket:
                     chunk = sock.recv(512)
                     if chunk: buffer += chunk
                 except Exception as ex:
+                    errCode = None
+                    try: errCode = ex.errcode
+                    except AttributeError: errCode = ex.args[0]
+                    if errCode in (11, 115, 10035):       # EAGAIN / WSAEWOULDBLOCK
+                        await asleep(1)                   # CPU’ya nefes ver
+                        continue
                     lastError = ex
                 # print(timeout, monotonic(), start)
                 if monotonic() - start >= timeout:
                     if lastError: raise lastError
                     return None
             busy()
-        except (RuntimeError, TimeoutError, OSError) as ex:
+        except (RuntimeError, OSError) as ex:
             errCode = None
             try: errCode = ex.errcode
             except AttributeError: errCode = ex.args[0]
             # if errCode == 10054:
             #    self.close()
-            if not (isinstance(ex, TimeoutError) or errCode == 116 or errCode == 10035):
+            # if not (isinstance(ex, TimeoutError) or errCode == 116 or errCode == 10035):
+            if errCode not in (11, 115, 116, 10035):
                 print('  !! sock recv:', ex)
                 print_exception(ex)
             return None
@@ -100,13 +104,13 @@ class BaseRawSocket:
         except Exception as ex:
             print('  !! sock recv:', ex); print_exception(ex)
             return None
-    def talk(self, data, timeout=None):
-        self.send(data)
-        return self.recv(timeout or self.getDefaultTimeout())
-    def sendJSON(self, data):
-        return self.send(data)
-    def recvJSON(self, timeout=None):
-        result = self.recv(timeout)
+    async def talk(self, data, timeout=None):
+        await self.send(data)
+        return await self.recv(timeout or self.getDefaultTimeout())
+    async def sendJSON(self, data):
+        return await self.send(data)
+    async def recvJSON(self, timeout=None):
+        result = await self.recv(timeout)
         if isinstance(result, str):
             for check in [('{', '}'), ('[', ']')]:
                 if not result.startswith(check[0]) and result.endswith(check[1]):
@@ -114,23 +118,23 @@ class BaseRawSocket:
                 elif result.startswith(check[0]) and not result.endswith(check[1]):
                     result += check[1]
         return json.loads(result) if result else None
-    def talkJSON(self, data, timeout=None):
-        result = self.talk(data, timeout)
+    async def talkJSON(self, data, timeout=None):
+        result = await self.talk(data, timeout)
         return json.loads(result) if result else None
-    def wsSend(self, api, args = None, data = None, wsPath = None):
-        return self.sendJSON(getWSData(api, args, data, wsPath))
-    def wsRecv(self, timeout=None):
-        return self.recvJSON(timeout)
-    def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
-        return self.talkJSON(getWSData(api, args, data, wsPath), timeout)
-    def wsCheckStatusIfNeed(self, timeout=None):
-        return self.wsCheckStatus(timeout) if statusShouldBeChecked() else False
-    def wsCheckStatus(self, timeout=None):
+    async def wsSend(self, api, args = None, data = None, wsPath = None):
+        return await self.sendJSON(getWSData(api, args, data, wsPath))
+    async def wsRecv(self, timeout=None):
+        return await self.recvJSON(timeout)
+    async def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
+        return await self.talkJSON(getWSData(api, args, data, wsPath), timeout)
+    async def wsCheckStatusIfNeed(self, timeout=None):
+        return await self.wsCheckStatus(timeout) if statusShouldBeChecked() else False
+    async def wsCheckStatus(self, timeout=None):
         result = None
         try:
             for i in range(0, 3):
                 if result is not None: break
-                result = self.wsTalk('tekilTezgahBilgi')
+                result = await self.wsTalk('tekilTezgahBilgi')
             if not result:
                 raise RuntimeError('check failed')
             if isinstance(result, str): result = json.loads(result)
@@ -144,14 +148,14 @@ class BaseRawSocket:
         finally:
             if result is None: self.close()
             shared.lastTime.statusCheck = monotonic()
-    def wsHeartbeatIfNeed(self, timeout=None):
-        return self.wsHeartbeat(timeout) if heartbeatShouldBeChecked() else True
-    def wsHeartbeat(self, timeout=None):
+    async def wsHeartbeatIfNeed(self, timeout=None):
+        return await self.wsHeartbeat(timeout) if heartbeatShouldBeChecked() else True
+    async def wsHeartbeat(self, timeout=None):
         result = None
         try:
             for i in range(0, 3):
                 if result is not None: break
-                result = self.wsTalk('ping')
+                result = awaitself.wsTalk('ping')
             if not result:
                 raise RuntimeError('check failed')
             # print('[wsHeartbeat] ', result)

@@ -1,6 +1,5 @@
 from common import *
 from config import hw
-from time import sleep, monotonic
 
 class BaseLCD:
     @classmethod
@@ -30,23 +29,28 @@ class BaseLCD:
     def write(self, data, row=0, col=0, _internal=False):
         if not _internal: self._lastWriteTime = monotonic()
         rowCount = self.getRows()
-        if not (0 <= row < rowCount): return self
+        if not (0 <= row < rowCount):
+            return self
         buf = self._buffer
         for i, ch in enumerate(data):
             if col + i < len(buf[row]):
                 buf[row][col + i] = ch
         return self
+    def clearLine(self, row):
+        if isinstance(row, range):
+            row = range(row.start, row.stop + 1)
+        if isinstance(row, (list, range)):
+            for _row in row:
+                self.clearLine(_row)
+            return self
+        cols = hw.lcd.cols
+        data = ' ' * cols
+        self.write(data, row, 0, True)
+        self._lastWriteTime = None
+        return self
     def writeLine(self, data, row=0, col=0, _internal=False):
         self.clearLine(row)
         return self.write(data, row, col, _internal)
-    def clearLine(self, row):
-        if isinstance(row, range): row = range(row.start, row.stop + 1)
-        if isinstance(row, (list, range)):
-            for _row in row: self.clearLine(_row)
-            return self
-        self.write(' ' * hw.lcd.cols, row, 0, True)
-        self._lastWriteTime = None
-        return self
     def clear(self):
         self._lastWriteTime = None
         cols = self.getCols(); rows = self.getRows()
@@ -76,16 +80,26 @@ class BaseLCD:
             self.clearLineIfReady(r)
         return self
         # return self.clear()
+    def move(self, row=0, col=0):
+        return self
     def on(self):
         return self
     def off(self):
+        return self
+    def blink(self):
+        return self
+    def unblink(self):
+        return self
+    def showCursor(self):
+        return self
+    def hideCursor(self):
         return self
     def _printBuffer(self):
         cols = shared.dev.lcd.getCols(); limit = cols + 4
         lines = self._read(asString=True)
         print('#' * limit)
         for line in lines:
-            text = line.ljust(cols)
+            text = ljust(line, cols)
             print(f'# {text} #')
         print('#' * limit)
         print()

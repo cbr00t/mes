@@ -1,11 +1,17 @@
-from time import monotonic, sleep
+import uasyncio as asyncio
+import time
 import json
-from traceback import print_exception
+import sys
+import gc
+from asyncio import sleep as asleep, sleep_ms as asleep_ms
+from time import sleep, sleep_ms, ticks_ms, sleep_us, ticks_diff
+from sys import print_exception, implementation as impl
 
 # Global Vars
 if not 'encoding' in globals():
     encoding = 'utf-8'
-
+def monotonic():
+    return ticks_ms() / 1000  # saniye cinsinden
 
 # ---------- General Structures ----------
 class NS:
@@ -80,6 +86,21 @@ def version2Str(value):
     return tuple2Str(value, '.')
 def str2Version(value):
     return str2Tuple(value, '.')
+def ljust(s, width, fillchar=' '):
+    """Return s left-justified in a string of length width."""
+    if len(s) >= width:
+        return s
+    return s + fillchar * (width - len(s))
+def rjust(s, width, fillchar=' '):
+    """Return s right-justified in a string of length width."""
+    if len(s) >= width:
+        return s
+    return fillchar * (width - len(s)) + s
+def substring(s, start, end=None):
+    """Return substring from start index up to but not including end index."""
+    if end is None:
+        return s[start:]
+    return s[start:end]
 def withErrCheckEx(func, exClass):
     def wrapper(*args, **kwargs):
         try:
@@ -102,10 +123,16 @@ def safeImport(name, as_ = None):
 def isWindows():
     import os
     return os.name == 'nt'       # Windows
+def isLocalPy():
+    return not(isCircuitPy() or isMicroPy())
 def isCircuitPy():
     try:
-        from sys import implementation as impl
         return impl.name == "circuitpython"
+    except:
+        return False
+def isMicroPy():
+    try:
+        return impl.name == "micropython"
     except:
         return False
 def splitext(filepath):
