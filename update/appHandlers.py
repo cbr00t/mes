@@ -1,19 +1,10 @@
 from common import *
 from config import local, server as srv
 from part import *
-from time import sleep, monotonic
-import json
-from traceback import print_exception
 
 class AppHandlers:
     def __init__(self):
         dev = self.dev = shared.dev
-        # sock = dev.sock; req = dev.req
-        # lcd = dev.lcd; keypad = dev.keypad
-        keypad = dev.keypad
-        if keypad is not None:
-            keypad.set_onPressed(self.keypad_onPressed)
-            keypad.set_onReleased(self.keypad_onReleased)
     
     ## Handler API Interface
     def exec(self, code):
@@ -25,45 +16,45 @@ class AppHandlers:
         return self
     def updateSelf(self):
         import app
-        app.updateSelf()
+        app.updateFiles()
         return self
     def ethIsConnected(self):
         return self.dev.eth.isConnected()
-    def sockIsConnected(self):
-        return self.dev.sock.isConnected()
-    def sockOpen(self, statusCheckMessage=None):
-        self.dev.sock.open()
+    def wsIsConnected(self):
+        return self.dev.ws.isConnected()
+    def wsOpen(self, statusCheckMessage=None):
+        self.dev.ws.open()
         return self
-    def sockSend(self, data):
-        self.dev.sock.send(data)
-        return self
-    def sockRecv(self, timeout=None):
-        return self.dev.sock.recv(timeout)
-    def sockTalk(self, data, timeout=None):
-        return self.dev.sock.talk(data, timeout)
-    def sockSendJSON(self, data):
-        self.dev.sock.sendJSON(data)
-        return self
-    def sockRecvJSON(self, timeout=None):
-        return self.dev.sock.recvJSON(timeout)
-    def sockTalkJSON(self, data, timeout=None):
-        return self.dev.sock.talkJSON(data, timeout)
-    def sockClose(self):
-        self.sock.close()
-        return self
-    def wsSend(self, api, args = None, data = None, wsPath = None):
-        self.dev.sock.wsSend(api, args, data, wsPath)
+    def wsSend(self, data):
+        self.dev.ws.send(data)
         return self
     def wsRecv(self, timeout=None):
-        return self.dev.sock.wsRecv(timeout)
+        return self.dev.ws.recv(timeout)
+    def wsTalk(self, data, timeout=None):
+        return self.dev.ws.talk(data, timeout)
+    def wsSendJSON(self, data):
+        self.dev.ws.sendJSON(data)
+        return self
+    def wsRecvJSON(self, timeout=None):
+        return self.dev.ws.recvJSON(timeout)
+    def wsTalkJSON(self, data, timeout=None):
+        return self.dev.ws.talkJSON(data, timeout)
+    def wsClose(self):
+        self.ws.close()
+        return self
+    def wsSend(self, api, args = None, data = None, wsPath = None):
+        self.dev.ws.wsSend(api, args, data, wsPath)
+        return self
+    def wsRecv(self, timeout=None):
+        return self.dev.ws.wsRecv(timeout)
     def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
-        return self.dev.sock.wsTalk(api, args, data, wsPath, timeout)
+        return self.dev.ws.wsTalk(api, args, data, wsPath, timeout)
     def wsHeartbeat(self, timeout=None):
-        return self.dev.sock.wsHeartbeat(timeout)
+        return self.dev.ws.wsHeartbeat(timeout)
     def getWSData(self, api, args = None, data = None, wsPath = None):
         return getWSData(api, args, data, wsPath)
-    def sockClose(self):
-        return self.dev.sock.close()
+    def wsClose(self):
+        return self.dev.ws.close()
     def req(self, data, timeout=None):
         return self.dev.req.send(data, timeout)
     def textReq(self, data, timeout=None):
@@ -97,12 +88,13 @@ class AppHandlers:
         return self
     def rfidRead(self):
         return self.dev.rfid.read()
+    def beep(self, freq, duration):
+        return self.dev.buzzer.beep(freq, duration)
     def checkStatus(self):
         return self
     def updateStatus(self, result):
         if result is not None:
             print(json.dumps(result))
-    
     # status checks
     def lcdIsBusy(self):
         return lcdIsBusy()
@@ -110,14 +102,3 @@ class AppHandlers:
         return lcdCanBeCleared()
     def heartbeatShouldBeChecked():
         return heartbeatShouldBeChecked()
-    
-    ## Event Handlers
-    def keypad_onPressed(self, key):
-        print(f'key_press: [{key}]')
-        handler = shared._onKeyPressed
-        if handler is not None: handler(key)
-    def keypad_onReleased(self, key, duration):
-        print(f'key_release: [{key}:{duration}]')
-        handler = shared._onKeyReleased
-        if handler is not None:
-            handler(key, duration)

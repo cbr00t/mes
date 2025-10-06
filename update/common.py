@@ -1,6 +1,47 @@
-from time import monotonic, sleep
 import json
-from traceback import print_exception
+import gc
+import sys
+import time
+from time import sleep
+from sys import implementation as impl
+
+if impl.name == 'cpython':    # CPython = (local)
+    import threading, traceback, asyncio
+    from asyncio import new_event_loop, set_event_loop
+    def print_exception(e):
+        traceback.print_exception(type(e), e, e.__traceback__)
+    # --- MicroPython API emülasyonu ---
+    def ticks_ms():
+        """Return milliseconds since an unspecified point, monotonic."""
+        return int(time.monotonic() * 1000)
+    def ticks_us():
+        """Return microseconds since an unspecified point, monotonic."""
+        return int(time.monotonic() * 1_000_000)
+    def ticks_diff(t1, t0=0):
+        """Return difference between two tick values."""
+        return t1 - t0
+    def sleep_ms(ms):
+        """Sleep given milliseconds."""
+        time.sleep(ms / 1000)
+    def sleep_us(us):
+        """Sleep given microseconds."""
+        time.sleep(us / 1_000_000)
+    async def asleep(sec):
+        """Async sleep in seconds (alias for asyncio.sleep)."""
+        await asyncio.sleep(sec)
+    async def asleep_ms(ms):
+        """Async sleep in milliseconds."""
+        await asyncio.sleep(ms / 1000)
+    def monotonic():
+        """Return monotonic time in seconds."""
+        return time.monotonic()
+elif impl.name == 'micropython':
+    import uasyncio as asyncio
+    from asyncio import sleep as asleep, sleep_ms as asleep_ms
+    from time import ticks_diff, ticks_ms, sleep_ms, sleep_us
+    from sys import print_exception
+    def monotonic():
+        return ticks_ms() / 1000
 
 # Global Vars
 if not 'encoding' in globals():
@@ -80,6 +121,26 @@ def version2Str(value):
     return tuple2Str(value, '.')
 def str2Version(value):
     return str2Tuple(value, '.')
+def ljust(s, width, fillchar=' '):
+    """Return s left-justified in a string of length width."""
+    if len(s) >= width:
+        return s
+    return s + fillchar * (width - len(s))
+def rjust(s, width, fillchar=' '):
+    """Return s right-justified in a string of length width."""
+    if len(s) >= width:
+        return s
+    return fillchar * (width - len(s)) + s
+def substring(s, start, end=None):
+    """Return substring from start index up to but not including end index."""
+    if end is None:
+        return s[start:]
+    return s[start:end]
+def uidToString(uid):
+    result = ''
+    for i in uid:
+        result = "%02X" % i + result
+    return result
 def withErrCheckEx(func, exClass):
     def wrapper(*args, **kwargs):
         try:
@@ -102,10 +163,16 @@ def safeImport(name, as_ = None):
 def isWindows():
     import os
     return os.name == 'nt'       # Windows
+def isLocalPy():
+    return not(isCircuitPy() or isMicroPy())
 def isCircuitPy():
     try:
-        from sys import implementation as impl
         return impl.name == "circuitpython"
+    except:
+        return False
+def isMicroPy():
+    try:
+        return impl.name == "micropython"
     except:
         return False
 def splitext(filepath):
@@ -119,6 +186,31 @@ def exists(fname):
         return True
     except OSError:
         return False
+def async_run(proc, *args, **kwargs):
+    if isMicroPy():
+        return asyncio.run(proc(*args, **kwargs))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(proc(*args, **kwargs))
+    finally:
+        loop.close()
+def async_task(proc, *args, **kwargs):
+    async def wrapper():
+        try:
+            await proc(*args, **kwargs)
+        except Exception as ex:
+            print(f"[ERROR in {proc.__name__}]", ex)
+            print_exception(ex)
+    return asyncio.create_task(wrapper())
+def thread(proc, *args, **kwargs):
+    """Runs proc in background thread or asyncio task if applicable."""
+    try:
+        # micropython tarafında sadece asyncio kullanılabilir
+        return asyncio.create_task(proc(*args, **kwargs))
+    except Exception as ex:
+        print("async thread hatası:", ex)
+        raise
 # ----------------------------------------------------------------------------- #
 
 
@@ -142,19 +234,27 @@ def getUpdateUrls():
         f'http://{ip}:{port}{updateUrl_postfix}'
         for port in srv.updatePorts
     ]
+def getWSUrlBase(https = None, ip = None, port = None):
+    from config import server as srv
+    if https is None: https = False
+    protocolPostfix = 'https' if https else 'http'
+    ip = ip or ip2Str(srv.ip)
+    port = port or srv.wsPort
+    return f'{protocolPostfix}://{ip}:{port}'
 def getWSUrl(qs = None, wsPath = None, api = None, https = None):
     from config import local, server as srv
-    if https is None: https = False;
-    protocolPostfix = 'https' if https else 'http'
-    ip = ip2Str(srv.ip); port = srv.wsPort
+    base = getWSUrlBase(https)
     wsPath = (wsPath if wsPath else srv.wsPath).strip('/ ')
-    result = f'{protocolPostfix}://{ip}:{port}/{wsPath}'
-    if api: result += f'/{api}'
+    result = f'{base}/{wsPath}'
+    if api:
+        result += f'/{api}'
     result += f'/?.ip={ip2Str(local.ip)}'
     if qs and isinstance(qs, dict):
         for key, value in qs.items():
             result += f'&{str(key)}'
-            if value: result += f'={value}'
+            if value:
+                result += f'={value}'
+    print('[DEBUG] wsURL', result)
     return result.rstrip('&')
 
 def activePart():

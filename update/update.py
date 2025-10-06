@@ -1,27 +1,26 @@
 from common import *
 from config import local, server as srv, hw
-from time import sleep, monotonic
 from os import rename, remove
-import json
-import gc
 
-def updateFiles():
-    global dev, lcd, sock
-    dev = shared.dev
-    lcd = dev.lcd; sock = dev.sock
+async def updateFiles():
+    dev = shared.dev; lcd = dev.lcd; ws = dev.ws
     shared._updateCheckPerformed = True
-    autoUpdate = srv.autoUpdate; urls = getUpdateUrls()
+    urls = getUpdateUrls()
+    if not urls:
+        return False
+    autoUpdate = srv.autoUpdate
     if autoUpdate is None: autoUpdate = shared.updateCheck != False
     if autoUpdate is None: autoUpdate = False
-    if not (autoUpdate and urls):
+    if not autoUpdate:
         return False
-    if not lcdIsBusy():
-        lcd.clearLine(range(1, 3)); lcd.write('UPDATE CHECK', 1, 1)
+    lcd.clearIfReady()
+    lcd.writeIfReady('UPDATE CHECK', 1, 1)
     url = None; lastError = None
     for _url in urls:
-        if not _url: continue
+        if not _url:
+            continue
         try:
-            resp = sock.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=3)
+            resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=.05)
             print(f'<< resp', resp)
             resp = resp.get('data', dict()).get('string') if isinstance(resp, dict) else None
             # if resp:
@@ -42,18 +41,20 @@ def updateFiles():
         return False
     for name in resp.splitlines():
         name = name.strip()
-        if not name: continue
+        if not name:
+            continue
         try:
             busy(); fileUrl = f'{url}/{name}'
             if not lcdIsBusy():
-                lcd.clearLine(range(1, 3)); lcd.write('UPDATING:', 1, 1)
-                lcd.write(name, 2, 5)
+                lcd.write('UPDATING:      ', 1, 1)
+                lcd.writeLine(name, 2, 3)
             # Uzak Dosyayı indir
-            fileContent = sock.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=3)
+            fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=.5)
             fileContent = fileContent.get('data', dict()).get('string') if isinstance(fileContent, dict) else None
             gc.collect()
             if fileContent:
-                if fileContent: fileContent = fileContent.replace('\r', '')
+                if fileContent:
+                    fileContent = fileContent.replace('\r', '')
                 # try:
                 #     fileContent = from64(fileContent.encode(encoding))
                 #     if fileContent: fileContent = fileContent.replace('\r', '')
@@ -80,7 +81,7 @@ def updateFiles():
             with open(localFile, 'w', encoding=encoding) as f:
                 try:
                     f.write(fileContent); success = True
-                    lcd.write('OK', 1, 0)
+                    lcd.write('OK ', 1, 0)
                     print('        ...  UPDATED')
                 except Exception as ex2:
                     lcd.write('ERR', 1, 0)
@@ -92,4 +93,5 @@ def updateFiles():
         except Exception as ex:
             print('[ERROR]', ex); print_exception(ex)
             continue
+    lcd.clearIfReady()
     return True

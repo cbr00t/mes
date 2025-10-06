@@ -1,13 +1,12 @@
 from common import *
 
-
 ###############################
 #       Uygulama Ayarları     #
 ###############################
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 0, 30)
+    version                         = (1, 1, 3)
 )
 
 
@@ -18,6 +17,8 @@ app = NS(
 ## Cihaz Ayarları
 ## --------------------------------
 local = NS(
+    ip                              =  None,
+    gateway                         =  None,
     subnet                          =  (255, 255, 255, 0),
     dns                             =  (1, 1, 1, 1),
     idleTime                        =  500
@@ -37,6 +38,12 @@ server = NS(
     socketTimeout                   =  0.5                                 # in secs. default value
 )
 
+wifi = NS(
+    ssid                            = '',
+    passwd                          = '',
+    timeout                         = 10
+)
+
 ## Modül Ayarları
 ## --------------------------------
 mod = NS(
@@ -47,59 +54,30 @@ mod = NS(
 ## Hardware Ayarları
 ## --------------------------------
 hw = NS(
-    eth = NS(
-        cs    = 'GP17',
-        spi   = ['GP18', 'GP19', 'GP16'],
-        reset = 'GP20'
-    ),
+    # eth = NS(
+    #     cs    = 'GP17',
+    #     spi   = ['GP18', 'GP19', 'GP16'],
+    #     reset = 'GP20'
+    # ),
     keypad = NS(
-        rows  = ['GP12', 'GP13', 'GP14', 'GP15'],
-        cols  = ['GP7', 'GP8', 'GP9', 'GP10', 'GP11'],
+        rows  = [12, 13, 14, 15],                   # board.(GP12..GP15)
+        cols  = [7, 8, 9, 10, 11],                  # board.(GP7..GP11)
         keys  = [
             ['f1', '1', '2', '3', 'X'],
             ['f2', '4', '5', '6', 'up'],
             ['f3', '7', '8', '9', 'down'],
             ['f4', 'esc', '0', 'enter', None]
-        ]
+        ],
+        debounce_ms = 10, multi = True
     ),
     lcd = NS(
-        rows = 4, cols = 20,
-        clearDelay = 2
-    )
+        rows = int(4), cols = int(20),
+        _id = 1, scl = 27, sda = 26,
+        freq = 400_000, addr = 0x27
+    ),
+    led = NS(count = 1, pin = 22, brightness = 200),
+    buzzer = NS(pin = 21, freq = 440, duration = 0.2, pause = 0.05)
 )
 
+from config_override import *
 
-
-if isCircuitPy():
-
-###############################
-#    Gerçek Ortam Ayarları    #
-###############################
-
-## Cihaz Ayarları
-## --------------------------------
-    local.ip                        =  (192, 168, 2, 50)
-    local.gateway                   =  (192, 168, 2, 1)
-
-
-## Ana Makine (Server) Ayarları
-## --------------------------------
-    server.ip                       =  (192, 168, 2, 2)
-
-
-else:
-
-###############################
-#     Test Ortamı Ayarları    #
-###############################
-
-## Cihaz Ayarları
-## --------------------------------
-    local.ip                        =  (192, 168, 1, 48)
-    local.gateway                   =  (192, 168, 1, 1)
-
-
-## Ana Makine (Server) Ayarları
-## --------------------------------
-    server.ip                       =  (192, 168, 1, 48)
-  # server.ip                       =  (192, 168, 1, 200)
