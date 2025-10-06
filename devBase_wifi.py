@@ -1,21 +1,13 @@
 ### devBase.py (Ortak Modül)
 from common import *
 from config import local, wifi
-import rp2
-from network import WLAN, STA_IF
 
 class BaseWiFi:
     def __init__(self):
-        wlan = self.wlan = WLAN(STA_IF)
-        wlan.active(True)
-        try:
-            import rp2
-            rp2.country('TR')   # ülke seçimi (varsa)
-        except Exception:
-            pass
+        wlan = self.wlan = None
     def isConnected(self):
         wlan = self.wlan
-        return wlan.isconnected()
+        return True
     def connect(self, ssid = None, passwd = None, timeout = None):
         wlan = self.wlan
         if not wlan: self.init(); wlan = self.wlan
@@ -31,10 +23,11 @@ class BaseWiFi:
                 wlan.ifconfig((ip2Str(local.ip), ip2Str(local.subnet), ip2Str(local.gateway), ip2Str(local.dns)))
             wlan.connect(ssid, passwd)
             # bağlanana kadar bekle
-            t0 = time.ticks_ms()
-            while not wlan.isconnected() and (not timeout or ticks_diff(ticks_ms(), t0) < timeout * 1000):
-                print("Bağlanıyor...")
-                sleep(.5)
+            if 'ticks_ms' in globals():
+                t0 = ticks_ms()
+                while not wlan.isconnected() and (not timeout or ticks_diff(ticks_ms(), t0) < timeout * 1000):
+                    print("Bağlanıyor...")
+                    sleep(.5)
             if local and wlan.isconnected():
                 wlan.ifconfig((ip2Str(local.ip), ip2Str(local.subnet), ip2Str(local.gateway), ip2Str(local.dns)))
         return True

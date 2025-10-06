@@ -3,6 +3,7 @@ from devBase_eth import *
 from devBase_wifi import *
 from devBase_webReq import *
 from devBase_rawSocket import *
+from devBase_webSocket import *
 from devBase_keypad import *
 from devBase_lcd import *
 from devBase_led import *

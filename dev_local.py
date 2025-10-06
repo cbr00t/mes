@@ -6,6 +6,12 @@ import socket
 import requests
 # import keyboard
 
+try:
+    import websockets
+except ImportError:
+    websockets = None
+
+
 # ---------- Ethernet Class (Mock) ----------
 class Eth(BaseEth):
     def __init__(self):
@@ -29,8 +35,8 @@ class WebReq(BaseWebReq):
 
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
-    def _open(self):
-        if not super()._open(): return self
+    async def _open(self):
+        if not await super()._open(): return self
         srv = self.server; ep = (ip2Str(srv.ip), srv.rawPort)
         sock = self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -40,6 +46,25 @@ class RawSocket(BaseRawSocket):
             sock = self.sock = None
             raise
         return self.isConnected()
+
+class WebSocket(BaseWebSocket):
+    async def _open(self):
+        if not websockets:
+            raise ImportError("websockets module not found. Install via: pip install websockets")
+
+        url = self.url              # örn: ws://127.0.0.1:8765/path
+        try:
+            self.ws = await websockets.connect(
+                url,
+                max_size=64 * 1024,
+                ping_interval=2_000
+            )
+            print("Connected to", url)
+            return True
+        except Exception as ex:
+            print("[ERROR] ws open:", ex); print_exception(ex)
+            self.ws = None
+            return False
 
 # ---------- Keypad Class (Mock) ----------
 class Keypad(BaseKeypad):
@@ -109,15 +134,17 @@ class RFIDCtl(BaseRFID):
 # ---------- Device Initialization ----------
 shared.updateCheck = False                                     # if config.autoUpdate is None
 dev = shared.dev = Device()
-def setup_eth(): dev.eth = Eth().init()
-def setup_req(): dev.req = WebReq();
-def setup_sock(): dev.sock = RawSocket()
+def setup_wifi():   dev.wifi   = BaseWiFi()
+def setup_req():    dev.req    = WebReq()
+# def setup_sock():   dev.sock   = RawSocket()
+def setup_ws():     dev.ws     = WebSocket()
 def setup_keypad(): dev.keypad = Keypad()
-def setup_lcd(): dev.lcd = LCDCtl()
-def setup_led(): dev.led = LEDCtl()
-def setup_rfid(): dev.rfid = RFIDCtl()
+def setup_lcd():    dev.lcd    = BaseLCD()
+def setup_led():    dev.led    = BaseLED()
+def setup_rfid():   dev.rfid   = BaseRFID()
+def setup_buzzer(): dev.buzzer = BaseBuzzer()
 steps = [
-    setup_eth, setup_req, setup_sock, setup_keypad,
+    setup_wifi, setup_req, setup_ws, setup_keypad,
     setup_lcd, setup_led, setup_rfid
 ]
 for step in steps:

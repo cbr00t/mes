@@ -2,16 +2,39 @@
 from common import *
 from config import local, server as srv, hw
 from devBase import *
-from machine import Pin, I2C
 import urequests
 import socket
+from machine import Pin, I2C, PWM
+from network import WLAN, STA_IF
+import rp2
 from pico_i2c_lcd import I2cLcd
 # from lcd_api import LcdApi
 from neopixel_pio import Neopixel2
 
+# Birkaç farklı paket ismi olabildiği için esnek import:
+_ws_client = None
+for modname in ("uwebsockets.client", "websockets.client", "uwebsocket.client", "uwebsockets"):
+    try:
+        _ws_client = __import__(modname, None, None, ("connect",))
+        break
+    except Exception:
+        pass
+
 # ---------- BaseWiFi Class ----------
 class WiFi(BaseWiFi):
-    pass
+    def __init__(self):
+        super().__init__()
+        wlan = self.wlan = WLAN(STA_IF)
+        wlan.active(True)
+        try:
+            import rp2
+            rp2.country('TR')   # ülke seçimi (varsa)
+        except Exception:
+            pass
+    def isConnected(self):
+        super().isConnected()
+        wlan = self.wlan
+        return wlan.isconnected()
 
 # ---------- Web Requests Class ----------
 class WebReq(BaseWebReq):
@@ -43,6 +66,21 @@ class RawSocket(BaseRawSocket):
             self.sock = None
             print("! [ERROR]", "sock_open", ex)
             raise
+        return self.isConnected()
+
+class WebSocket(BaseWebSocket):
+    async def _open(self):
+        if not _ws_client:
+            raise ImportError("uwebsockets/websockets client module not found")
+        url = self.url
+        # Bağlantı (awaitable ya da sync olabilir → her iki yolu da dene)
+        conn = _ws_client.connect(url)
+        if hasattr(conn, "__await__"):
+            ws = await conn
+        else:
+            ws = conn
+        # bazı portlarda send/recv async değil; wrapper gerekmez, üst sınıf zaten ikisini de destekliyor
+        self.ws = ws
         return self.isConnected()
 
 # ---------- Keypad Control Class ----------
@@ -86,6 +124,7 @@ class Keypad(BaseKeypad):
         self._aborted = True
         return self
     async def loop(self):
+        await super.loop()
         # t0 = time.ticks_ms()
         # while time.ticks_diff(time.ticks_ms(), t0) < duration_s * 1000:
         last = []                                                               # Önceki basılı tuşlar (liste, sıralı)
@@ -104,7 +143,7 @@ class Keypad(BaseKeypad):
                     duration = ticks_diff(self._lastKeyReleaseTime, self._lastKeyPressTime) / 1000 * 4
                     if self.onReleased: await self.onReleased(key, duration)
                 last = pressed  # mevcut durumu kaydet
-                await asleep_ms(1)
+                sleep(1)
             except Exception as ex:
                 print("Keypad tarama hatası:", ex)
                 print_exception(ex)
@@ -192,6 +231,7 @@ class LCD(BaseLCD):
 
 class LED(BaseLED):
     def __init__(self):
+        super().__init__()
         c = hw.led
         # SM0, pin=GP1, renk sırası GRB
         strip = self.strip = Neopixel2(c.count, 0, c.pin, "GRB")
@@ -213,10 +253,14 @@ class LED(BaseLED):
         return self
 
 class RFID(BaseRFID):
-    pass
+    def __init__(self):
+        super().__init__()
 
 class Buzzer(BaseBuzzer):
-    pass
+    def __init__(self):
+        super().__init__()
+        c = hw.buzzer
+        self.buzzer = PWM(Pin(c.pin))
 
 # ---------- Device Initialization ----------
 shared.updateCheck = True
@@ -224,7 +268,8 @@ dev = shared.dev = Device()
 
 def setup_wifi():   dev.wifi  = WiFi()
 def setup_req():    dev.req   = WebReq()
-def setup_sock():   dev.sock  = RawSocket()
+# def setup_sock():   dev.sock  = RawSocket()
+def setup_ws():     dev.ws    = WebSocket()
 def setup_keypad(): dev.keypad= Keypad()
 def setup_lcd():    dev.lcd   = LCD()
 def setup_led():    dev.led   = LED()
@@ -232,8 +277,7 @@ def setup_rfid():   dev.rfid  = RFID()
 def setup_buzzer(): dev.buzzer  = Buzzer()
 
 for step in [
-    setup_wifi, setup_req, setup_sock,
-    setup_keypad, setup_lcd, setup_led,
-    setup_rfid, setup_buzzer
+    setup_wifi, setup_req, setup_ws, setup_keypad,
+    setup_lcd, setup_led, setup_rfid, setup_buzzer
 ]:
     step()

@@ -5,6 +5,8 @@ class BaseKeypad:
         self._lastKeyPressTime = self._lastKeyReleaseTime = None
         self.onPressed = onPressed; self.onReleased = onReleased
         pass
+    async def loop(self):
+        return self
     def update(self):
         return self
     def set_onPressed(self, handler):

@@ -2,12 +2,10 @@
 
 from common import *
 from config import hw
-from machine import Pin, PWM
 
 class BaseBuzzer:
     def __init__(self):
-        c = hw.buzzer
-        self.buzzer = PWM(Pin(c.pin))
+        self.buzzer = None
     def beep(self, freq=None, duration=None, pause=None):
         c = hw.buzzer
         if freq is None: freq = c.freq

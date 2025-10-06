@@ -2,8 +2,20 @@ from common import *
 from config import local, server, wifi
 
 
-if not isLocalPy():
 
+###############################
+#         Ortak Ayarlar       #
+###############################
+
+## Ana Makine (Server) Ayarları
+## --------------------------------
+server.ip                           =  (192, 168, 1, 7)
+
+
+
+
+
+if not isLocalPy():
 
 
 ###############################
@@ -19,14 +31,7 @@ if not isLocalPy():
 
 
 
-## Ana Makine (Server) Ayarları
-## --------------------------------
-    server.ip                       =  (192, 168, 1, 5)
-
-
-
 else:
-
 
 
 ###############################
@@ -37,10 +42,4 @@ else:
 ## --------------------------------
     local.ip                        =  (192, 168, 1, 123)
     local.gateway                   =  (192, 168, 1, 1)
-
-
-## Ana Makine (Server) Ayarları
-## --------------------------------
-    server.ip                       =  (192, 168, 1, 2)
-  # server.ip                       =  (192, 168, 1, 200)
 

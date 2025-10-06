@@ -1,17 +1,52 @@
-import uasyncio as asyncio
-import time
 import json
-import sys
 import gc
-from asyncio import sleep as asleep, sleep_ms as asleep_ms
-from time import sleep, sleep_ms, ticks_ms, sleep_us, ticks_diff
-from sys import print_exception, implementation as impl
+import sys
+import time
+from time import sleep
+from sys import implementation as impl
+
+if impl.name == 'cpython':    # CPython = (local)
+    import threading, traceback, asyncio
+    from asyncio import new_event_loop, set_event_loop
+    def print_exception(e):
+        traceback.print_exception(type(e), e, e.__traceback__)
+    # --- MicroPython API emülasyonu ---
+    def ticks_ms():
+        """Return milliseconds since an unspecified point, monotonic."""
+        return int(time.monotonic() * 1000)
+    def ticks_us():
+        """Return microseconds since an unspecified point, monotonic."""
+        return int(time.monotonic() * 1_000_000)
+    def ticks_diff(t1, t0=0):
+        """Return difference between two tick values."""
+        return t1 - t0
+    def sleep_ms(ms):
+        """Sleep given milliseconds."""
+        time.sleep(ms / 1000)
+    def sleep_us(us):
+        """Sleep given microseconds."""
+        time.sleep(us / 1_000_000)
+    async def asleep(sec):
+        """Async sleep in seconds (alias for asyncio.sleep)."""
+        await asyncio.sleep(sec)
+    async def asleep_ms(ms):
+        """Async sleep in milliseconds."""
+        await asyncio.sleep(ms / 1000)
+    def monotonic():
+        """Return monotonic time in seconds."""
+        return time.monotonic()
+elif impl.name == 'micropython':
+    import uasyncio as asyncio
+    from asyncio import sleep as asleep, sleep_ms as asleep_ms
+    from time import ticks_diff, ticks_ms, sleep_ms, sleep_us
+    from sys import print_exception
+    def monotonic():
+        return ticks_ms() / 1000
 
 # Global Vars
 if not 'encoding' in globals():
     encoding = 'utf-8'
-def monotonic():
-    return ticks_ms() / 1000  # saniye cinsinden
+
 
 # ---------- General Structures ----------
 class NS:
@@ -146,6 +181,49 @@ def exists(fname):
         return True
     except OSError:
         return False
+def async_run(proc, *args, **kwargs):
+    if impl.name == "micropython":
+        import uasyncio as asyncio
+        return asyncio.run(proc(*args, **kwargs))
+    else:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(proc(*args, **kwargs))
+        finally:
+            loop.close()
+def async_task(proc, *args, **kwargs):
+    async def wrapper():
+        try:
+            await proc(*args, **kwargs)
+        except Exception as ex:
+            print(f"[ERROR in {proc.__name__}]", ex)
+            print_exception(ex)
+    return asyncio.create_task(wrapper())
+def thread(proc, *args, **kwargs):
+    """Runs proc in background thread or asyncio task if applicable."""
+    try:
+        # micropython tarafında sadece asyncio kullanılabilir
+        coro = proc(*args, **kwargs)
+        if hasattr(coro, "__await__"):
+            return asyncio.create_task(coro)
+        return coro
+    except Exception as ex:
+        print("async thread hatası:", ex)
+        return None
+async def wait_thread(proc, *args, **kwargs):
+    if impl.name == 'micropython':
+        try:
+            return await asyncio.create_task(proc(*args, **kwargs))
+        except Exception as ex:
+            print("async wait hatası:", ex)
+            return None
+    else:
+        import threading
+        t = threading.Thread(target=proc, daemon=True)
+        t.start(); t.join()
+        return t
 # ----------------------------------------------------------------------------- #
 
 
@@ -169,19 +247,27 @@ def getUpdateUrls():
         f'http://{ip}:{port}{updateUrl_postfix}'
         for port in srv.updatePorts
     ]
+def getWSUrlBase(https = None, ip = None, port = None):
+    from config import server as srv
+    if https is None: https = False
+    protocolPostfix = 'https' if https else 'http'
+    ip = ip or ip2Str(srv.ip)
+    port = port or srv.wsPort
+    return f'{protocolPostfix}://{ip}:{port}'
 def getWSUrl(qs = None, wsPath = None, api = None, https = None):
     from config import local, server as srv
-    if https is None: https = False;
-    protocolPostfix = 'https' if https else 'http'
-    ip = ip2Str(srv.ip); port = srv.wsPort
+    base = getWSUrlBase(https)
     wsPath = (wsPath if wsPath else srv.wsPath).strip('/ ')
-    result = f'{protocolPostfix}://{ip}:{port}/{wsPath}'
-    if api: result += f'/{api}'
+    result = f'{base}/{wsPath}'
+    if api:
+        result += f'/{api}'
     result += f'/?.ip={ip2Str(local.ip)}'
     if qs and isinstance(qs, dict):
         for key, value in qs.items():
             result += f'&{str(key)}'
-            if value: result += f'={value}'
+            if value:
+                result += f'={value}'
+    print('[DEBUG] wsURL', result)
     return result.rstrip('&')
 
 def activePart():
