@@ -10,15 +10,20 @@ import rp2
 from pico_i2c_lcd import I2cLcd
 # from lcd_api import LcdApi
 from neopixel_pio import Neopixel2
+from mpy_websocket import client as _ws_client
 
-# Birkaç farklı paket ismi olabildiği için esnek import:
-_ws_client = None
-for modname in ("uwebsockets.client", "websockets.client", "uwebsocket.client", "uwebsockets"):
-    try:
-        _ws_client = __import__(modname, None, None, ("connect",))
-        break
-    except Exception:
-        pass
+# # Birkaç farklı paket ismi olabildiği için esnek import:
+# _ws_client = None
+# try:
+#     from uwebsockets import client
+#     _ws_client = client
+# except:
+#     for modname in ("uwebsockets.client", "websockets.client", "uwebsocket.client", "uwebsockets"):
+#         try:
+#             _ws_client = __import__(modname, None, None, ("connect",))
+#             break
+#         except Exception:
+#             pass
 
 # ---------- BaseWiFi Class ----------
 class WiFi(BaseWiFi):
@@ -108,6 +113,7 @@ class Keypad(BaseKeypad):
         super().__init__(onPressed, onReleased)
         c = hw.keypad
         self._aborted = False
+        self._last = []
         _rows = self._rows = [Pin(p, Pin.OUT, value=1) for p in c.rows]              # PASIF HIGH
         _cols = self._cols = [Pin(p, Pin.IN, Pin.PULL_UP) for p in c.cols]
         self._rlen = len(_rows)
@@ -124,37 +130,44 @@ class Keypad(BaseKeypad):
         self._aborted = True
         return self
     async def loop(self):
-        await super.loop()
+        await super().loop()
         # t0 = time.ticks_ms()
-        # while time.ticks_diff(time.ticks_ms(), t0) < duration_s * 1000:
-        last = []                                                               # Önceki basılı tuşlar (liste, sıralı)
+        # while time.ticks_diff(time.ticks_ms(), t0) < duration * 1000:
         while not self._aborted:
-            try:
-                pressed = self.pressed_keys                                     # Liste (sıralı)
-                # --- yeni basılanlar (sırayla, tekrar etmeden)
-                for key in pressed:
-                    if key in last: continue
-                    self._lastKeyPressTime = ticks_ms()
-                    if self.onPressed: await self.onPressed(key)
-                # --- bırakılanlar (önceden vardı ama şimdi yok)
-                for key in last:
-                    if key in pressed: continue
-                    self._lastKeyReleaseTime = ticks_ms()
-                    duration = ticks_diff(self._lastKeyReleaseTime, self._lastKeyPressTime) / 1000 * 4
-                    if self.onReleased: await self.onReleased(key, duration)
-                last = pressed  # mevcut durumu kaydet
-                sleep(1)
-            except Exception as ex:
-                print("Keypad tarama hatası:", ex)
-                print_exception(ex)
+            self.update()
+            await asleep(.05)
         self._aborted = False
         return self
+    async def update(self):
+        await super().update()
+        last = self._last
+        try:
+            pressed = self.pressed_keys                                     # Liste (sıralı)
+            if pressed:
+                # --- yeni basılanlar (sırayla, tekrar etmeden)
+                lastTime = monotonic()
+                for key in pressed:
+                    if key in last: continue
+                    if self.onPressed: await self.onPressed(key)
+                self._lastKeyPressTime = lastTime
+            if last:
+                # --- bırakılanlar (önceden vardı ama şimdi yok)
+                lastTime = monotonic()
+                for key in last:
+                    if key in pressed: continue
+                    duration = monotonic() - self._lastKeyPressTime
+                    if self.onReleased: await self.onReleased(key, duration)
+                self._lastKeyReleaseTime = lastTime
+            last = self._last = pressed  # mevcut durumu kaydet
+        except Exception as ex:
+            print("Keypad tarama hatası:", ex)
+            print_exception(ex)
     def _scan_raw(self):
         """True=basılı, False=serbest"""
         state = [[False]*self._clen for _ in range(self._rlen)]
         for r, rpin in enumerate(self._rows):
             rpin.value(0)      # o satırı aktif et (LOW)
-            sleep_us(50)       # kısa stabilizasyon
+            sleep_us(10)       # kısa stabilizasyon
             for c, cpin in enumerate(self._cols):
                 # Pull-up var; LOW -> tuş basılı
                 state[r][c] = (cpin.value() == 0)
@@ -186,9 +199,10 @@ class LCD(BaseLCD):
         print(f'c.cols = {c.cols}')
         i2c = self.i2c = I2C(c._id, scl=Pin(c.scl), sda=Pin(c.sda), freq=c.freq)
         lcd = self.lcd = I2cLcd(i2c, addr, c.rows, c.cols)
-        self.blink()
+        self.unblink()
         self.showCursor()
         self.clear()
+        # lcd.hal_write_command(lcd.LCD_ENTRY_MODE)
     def clear(self):
         super().clear()
         self.lcd.clear()
@@ -266,15 +280,15 @@ class Buzzer(BaseBuzzer):
 shared.updateCheck = True
 dev = shared.dev = Device()
 
-def setup_wifi():   dev.wifi  = WiFi()
-def setup_req():    dev.req   = WebReq()
-# def setup_sock():   dev.sock  = RawSocket()
-def setup_ws():     dev.ws    = WebSocket()
-def setup_keypad(): dev.keypad= Keypad()
-def setup_lcd():    dev.lcd   = LCD()
-def setup_led():    dev.led   = LED()
-def setup_rfid():   dev.rfid  = RFID()
-def setup_buzzer(): dev.buzzer  = Buzzer()
+def setup_wifi():   dev.wifi   = WiFi()
+def setup_req():    dev.req    = WebReq()
+# def setup_sock():   dev.sock   = RawSocket()
+def setup_ws():     dev.ws     = WebSocket()
+def setup_keypad(): dev.keypad = Keypad()
+def setup_lcd():    dev.lcd    = LCD()
+def setup_led():    dev.led    = LED()
+def setup_rfid():   dev.rfid   = RFID()
+def setup_buzzer(): dev.buzzer = Buzzer()
 
 for step in [
     setup_wifi, setup_req, setup_ws, setup_keypad,

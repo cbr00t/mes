@@ -28,6 +28,7 @@ class BaseLED:
     def _write(self, color):
         return self
     def clear(self):
+        self.write('SIYAH')
         return self
     def brightness(self, value):
         return self

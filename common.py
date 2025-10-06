@@ -136,6 +136,11 @@ def substring(s, start, end=None):
     if end is None:
         return s[start:]
     return s[start:end]
+def uidToString(uid):
+    result = ''
+    for i in uid:
+        result = "%02X" % i + result
+    return result
 def withErrCheckEx(func, exClass):
     def wrapper(*args, **kwargs):
         try:
@@ -182,17 +187,14 @@ def exists(fname):
     except OSError:
         return False
 def async_run(proc, *args, **kwargs):
-    if impl.name == "micropython":
-        import uasyncio as asyncio
+    if isMicroPy():
         return asyncio.run(proc(*args, **kwargs))
-    else:
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(proc(*args, **kwargs))
-        finally:
-            loop.close()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(proc(*args, **kwargs))
+    finally:
+        loop.close()
 def async_task(proc, *args, **kwargs):
     async def wrapper():
         try:
@@ -205,25 +207,10 @@ def thread(proc, *args, **kwargs):
     """Runs proc in background thread or asyncio task if applicable."""
     try:
         # micropython tarafında sadece asyncio kullanılabilir
-        coro = proc(*args, **kwargs)
-        if hasattr(coro, "__await__"):
-            return asyncio.create_task(coro)
-        return coro
+        return asyncio.create_task(proc(*args, **kwargs))
     except Exception as ex:
         print("async thread hatası:", ex)
-        return None
-async def wait_thread(proc, *args, **kwargs):
-    if impl.name == 'micropython':
-        try:
-            return await asyncio.create_task(proc(*args, **kwargs))
-        except Exception as ex:
-            print("async wait hatası:", ex)
-            return None
-    else:
-        import threading
-        t = threading.Thread(target=proc, daemon=True)
-        t.start(); t.join()
-        return t
+        raise
 # ----------------------------------------------------------------------------- #
 
 

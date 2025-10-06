@@ -13,15 +13,14 @@ async def updateFiles():
     if autoUpdate is None: autoUpdate = False
     if not autoUpdate:
         return False
-    if not lcdIsBusy():
-        lcd.clear()
-        lcd.write('UPDATE CHECK', 1, 1)
+    lcd.clearIfReady()
+    lcd.writeIfReady('UPDATE CHECK', 1, 1)
     url = None; lastError = None
     for _url in urls:
         if not _url:
             continue
         try:
-            resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=2)
+            resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=.05)
             print(f'<< resp', resp)
             resp = resp.get('data', dict()).get('string') if isinstance(resp, dict) else None
             # if resp:
@@ -47,14 +46,15 @@ async def updateFiles():
         try:
             busy(); fileUrl = f'{url}/{name}'
             if not lcdIsBusy():
-                lcd.clear().write('UPDATING:', 1, 1)
-                lcd.write(name, 2, 3)
+                lcd.write('UPDATING:      ', 1, 1)
+                lcd.writeLine(name, 2, 3)
             # Uzak Dosyayı indir
-            fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=5)
+            fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=.5)
             fileContent = fileContent.get('data', dict()).get('string') if isinstance(fileContent, dict) else None
             gc.collect()
             if fileContent:
-                if fileContent: fileContent = fileContent.replace('\r', '')
+                if fileContent:
+                    fileContent = fileContent.replace('\r', '')
                 # try:
                 #     fileContent = from64(fileContent.encode(encoding))
                 #     if fileContent: fileContent = fileContent.replace('\r', '')
@@ -93,4 +93,5 @@ async def updateFiles():
         except Exception as ex:
             print('[ERROR]', ex); print_exception(ex)
             continue
+    lcd.clearIfReady()
     return True

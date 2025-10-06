@@ -16,7 +16,7 @@ class AppHandlers:
         return self
     def updateSelf(self):
         import app
-        app.updateSelf()
+        app.updateFiles()
         return self
     def ethIsConnected(self):
         return self.dev.eth.isConnected()
@@ -88,6 +88,8 @@ class AppHandlers:
         return self
     def rfidRead(self):
         return self.dev.rfid.read()
+    def beep(self, freq, duration):
+        return self.dev.buzzer.beep(freq, duration)
     def checkStatus(self):
         return self
     def updateStatus(self, result):

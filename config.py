@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 2)
+    version                         = (1, 1, 3)
 )
 
 
@@ -75,7 +75,7 @@ hw = NS(
         _id = 1, scl = 27, sda = 26,
         freq = 400_000, addr = 0x27
     ),
-    led = NS(count = 1, pin = 22, brightness = 42),
+    led = NS(count = 1, pin = 22, brightness = 200),
     buzzer = NS(pin = 21, freq = 440, duration = 0.2, pause = 0.05)
 )
 

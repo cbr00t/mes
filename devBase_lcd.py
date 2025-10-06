@@ -49,8 +49,25 @@ class BaseLCD:
         self._lastWriteTime = None
         return self
     def writeLine(self, data, row=0, col=0, _internal=False):
-        self.clearLine(row)
-        return self.write(data, row, col, _internal)
+        lines = self.readLines()
+        if row < len(lines):
+            line = lines[row]
+            segment = line[col:col + len(data)]
+        if segment.strip() == data.strip():
+            print(f'!! same lcd line segment: [{data}]')
+            return self
+        if col > 0:
+            _data = ' ' * (col - 1)
+            self.write(_data, row, 0, True)
+        result = self.write(data, row, col, _internal)
+        endOffset = col + len(data)
+        padding = hw.lcd.cols - endOffset
+        if padding > 0:
+            _data = ' ' * padding
+            self.write(_data, row, endOffset, True)
+        if col == 0:
+            self.move(row, col)    # for fast cursor seek in same line
+        return result
     def clear(self):
         self._lastWriteTime = None
         cols = self.getCols(); rows = self.getRows()
@@ -63,21 +80,24 @@ class BaseLCD:
             if data == old: return self
         return self.write(data, row, col, _internal)
     def writeLineIfReady(self, data, row=0, col=0, _internal=False):
-        self.clearLineIfReady(row)
-        return self.writeIfReady(data, row, col, _internal)
-    def clearLineIfReady(self, row, _internal=False):
         if lcdIsBusy(): return self
-        if isinstance(row, range): row = range(row.start, row.stop + 1)
+        return self.writeLine(data, row, col, _internal)
+    def clearLineIfReady(self, row, _internal=False):
+        if lcdIsBusy():
+            return self
+        if isinstance(row, range):
+            row = range(row.start, row.stop + 1)
         if isinstance(row, (list, range)):
             for _row in row: self.clearLineIfReady(_row)
             return self
-        if not _internal:
-            if ''.join(self._buffer[row]).strip() == '': return self
+        if not _internal and ''.join(self._buffer[row]).strip() == '':
+            return self
         return self.clearLine(row)
     def clearIfReady(self):
-        if lcdIsBusy(): return self
+        if lcdIsBusy():
+            return self
         for r in range(self.getRows()):
-            self.clearLineIfReady(r)
+            self.clearLine(r)
         return self
         # return self.clear()
     def move(self, row=0, col=0):

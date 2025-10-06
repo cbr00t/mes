@@ -63,6 +63,7 @@ class BaseWebSocket:
                 await res
             # print('[DEBUG] ws after send - await')
             self._lastSend = monotonic()
+            await asleep(.05)
             # debug:
             # print(">>", text)
             return True
@@ -90,6 +91,7 @@ class BaseWebSocket:
             if text is None:
                 return None
             self._lastRecv = monotonic()
+            await asleep(.1)
             return text
         # except asyncio.TimeoutError:
         #     print('[WARN] ws recv timeout')
@@ -109,10 +111,10 @@ class BaseWebSocket:
         payload = getWSData(api, args=args, data=data, wsPath=wsPath)
         text = json.dumps(payload)
         return await self.send(text)
-
     async def wsRecv(self, timeout=None):
         """Sunucudan JSON bekler, çözüp dict/list döndürür."""
         text = await self.recv(timeout or srv.socketTimeout)
+        # print('******************* text = ', text)
         if not text:
             return None
         try:
@@ -120,7 +122,6 @@ class BaseWebSocket:
         except Exception:
             # plain text dönebilir; ham veriyi dön
             return text
-
     async def wsTalk(self, api, args=None, data=None, wsPath=None, timeout=None):
         """Gönder + cevap bekle (tek istek/tek cevap)."""
         if not self.isConnected():

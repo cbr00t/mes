@@ -7,7 +7,7 @@ class BaseKeypad:
         pass
     async def loop(self):
         return self
-    def update(self):
+    async def update(self):
         return self
     def set_onPressed(self, handler):
         self.onPressed = handler

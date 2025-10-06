@@ -6,54 +6,61 @@ from app_infoPart import *
 from app_menus import *
 
 async def init():
-    global _aborted, localIP, srvIP, srvPort, dev, wifi, ws, lcd, keypad, h
+    global aborted, localIP, srvIP, srvPort, dev, wifi, ws, lcd, led, keypad, buzzer, h
     localIP = ip2Str(local.ip); srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
     print(f'localIP: [{localIP}] | server rawwset: [{srvIP}:{srvPort}]')
-    _aborted = False
+    aborted = False
     dev = initDevice(); h = initHandlers()
-    wifi = dev.wifi; lcd = dev.lcd; ws = dev.ws; keypad = dev.keypad
-    shared._onKeyPressed = onKeyReleased
-    shared._onKeyReleased = onKeyPressed
+    wifi = dev.wifi; lcd = dev.lcd; led = dev.led;
+    ws = dev.ws; keypad = dev.keypad; buzzer = dev.buzzer
+    shared._onKeyPressed = onKeyPressed
+    shared._onKeyReleased = onKeyReleased
     
 async def run():
-    global _aborted
-    # wifi.connect()
-    lcd.off(); lcd.on()
-    lcd.clearIfReady(); await ws.close()
+    global aborted
+    lcd.off().on(); lcd.clearIfReady()
+    led.write('SIYAH'); led.clear()
+    for i in range(0, 2):
+        await buzzer.beep(4000, .1)
+    await buzzer.beep(4000, .3)
     print('app started')
     if keypad is not None:
         keypad.set_onPressed(shared._onKeyPressed)
         keypad.set_onReleased(shared._onKeyReleased)
-        thread(keypad.loop)
-    while not _aborted:
+    thread(threadProc)
+    while not aborted:
         try:
             await loop()
         except Exception as ex:
             print('[ERROR]', 'APP LOOP:', ex)
             print_exception(ex)
-    _aborted = True
+    aborted = True
     lcd.clear(); lcd.write('SHUTDOWN', 1,1)
     await ws.close()
-
+async def threadProc():
+    global aborted
+    while not aborted:
+        try:
+            await keypad.update()
+        except ex:
+            print(ex)
+            print('[ERROR]', ex); print_exception(ex)
+        await asleep(.5 if isIdle() else .01)
 async def loop():
-    global cpuHaltTime
-    cpuHaltTime = .5 if isIdle() else .1
-    await asleep(cpuHaltTime)
-    # if not shared._appTitleRendered: renderAppTitle()
-    # if lcd._lastWriteTime: lcd.clearLineIfReady(2)
-    lastGC = shared.lastTime.gc
-    if not lastGC or monotonic() - lastGC >= 2:
-        gc.collect(); shared.lastTime.gc = monotonic()
-    updateMainScreen()
-    if wifiCheck():
-        if await connectToServerIfNot():
-            if not shared._updateCheckPerformed:
-                await updateFiles()
-            await wsCheckStatusIfNeed()
-            await actionsCheckAndExec()
-            await processQueues()
-    updateMainScreen()
-
+    await asleep(1 if isIdle() else .01)
+    if not (await wifiCheck() and await connectToServerIfNot()): return
+    if not shared._updateCheckPerformed: await updateFiles()
+    lastTime = shared.lastTime
+    await processQueues()
+    if not lcdIsBusy():
+        await wsCheckStatusIfNeed()
+        await updateMainScreen()
+    if not lastTime.actionsCheck:
+        lastTime.actionsCheck = monotonic()
+    elif monotonic() - lastTime.actionsCheck >= 30:
+        await actionsCheckAndExec()
+        lastTime.actionsCheck = monotonic()
+    
 def initDevice():
     print('    init device')
     dev = shared.dev
@@ -74,18 +81,18 @@ def initHandlers():
     return h
 async def updateSelf():
     lcd.clearLine(3); lcd.write('GUNCELLENIYOR...', 3, 2)
-    sleep(0.5); srv.autoUpdate = True
+    await asleep(0.5); srv.autoUpdate = True
     await updateFiles(); reboot()
 def reboot():
     import machine
     print('rebooting...')
     lcd.clearLine(3); lcd.write('REBOOTING...', 3, 2)
-    sleep(.5); machine.reset()
+    await asleep(.5); machine.reset()
 
-def wifiWait():
+async def wifiWait():
     while not wifiCheck():
-        sleep(.1)
-def wifiCheck():
+        await asleep(.1)
+async def wifiCheck():
     if not wifi.isConnected():
         wifi.connect()
     lastTime = shared.lastTime
@@ -104,7 +111,7 @@ async def connectToServerIfNot():
         return True
     shared._appTitleRendered = False
     lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = None
-    if not wifiCheck():
+    if not await wifiCheck():
         return False
     shared._inActionsCheck = False; lastTime = shared.lastTime
     srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
@@ -118,14 +125,16 @@ async def connectToServerIfNot():
         print('[ERROR]', ex); print_exception(ex)
         return False
 
-def updateMainScreen():
+async def updateMainScreen():
+    # if True: return False
     if lcdIsBusy(): return False
     lastTime = shared.lastTime
     if lastTime.updateMainScreen and monotonic() - lastTime.updateMainScreen <= 0.5: return False
     renderAppTitle()
     # if lcdCanBeCleared(): lcd.clearLineIfReady(range(1, lcd.getRows() - 1))
     rec = shared.curStatus
-    rec = rec and rec[0] if isinstance(rec, list) else {}
+    rec = rec and rec[0] if isinstance(rec, list) else \
+          rec if isinstance(rec, dict) else {}
     _rec = {k: v for k, v in rec.items() if 'Sure' not in k}
     text = json.dumps(_rec)
     def str_val(key):
@@ -133,15 +142,26 @@ def updateMainScreen():
     def int_val(key):
         value = rec.get(key)
         return int(value) if isinstance(value, (str, int, float)) else 0
-    if text != shared._updateMainScreen_lastDebugText:
-        print(f'\nstatus_check:  \n  {text}\n')
+    # print('text = ', text)
+    # print('shared._updateMainScreen_lastDebugText = ', shared._updateMainScreen_lastDebugText)
+    urunKod = str_val('urunKod'); perKod = str_val('perKod')
+    if not urunKod:    # empty data
+        return False
+    hashStr = (
+        f"{urunKod}|{perKod}|{int_val('onceUretMiktar')}|{int_val('aktifUretMiktar')}",
+        f"{int_val('isSaymaInd')}|{int_val('isSaymaSayisi')}|{str_val('durumKod')}|{str_val('emirMiktar')}"
+    )
+    if hashStr != shared._updateMainScreen_lastHashStr:
+        print(f'status_check cur  hash:  \n  {hashStr}\n')
+        print(f'status_check prev hash:  \n  {shared._updateMainScreen_lastHashStr}\n')
+        shared._updateMainScreen_lastHashStr = hashStr
         shared._updateMainScreen_lastDebugText = text
-        #  {"isNetMiktar": 15.0, "operNo": 8, "isFireMiktar": 0.0, "siradakiIsSayi": 0, "emirNox": "1688", "sonDurTS": "26.08.2025 17:35:28", "duraksamaKritik": false, "hatID": "030", "aktifCevrimSayisi": 0, "atananIsSayi": 1, "sonIslemTS": "26.08.2025 17:30:27", "sabitDuraksamami": 0, "operAciklama": "CNC DİK TORNA", "emirMiktar": 2.0, "operatorCagrimTS": null, "ip": "192.168.2.50", "onceUretMiktar": 15.0, "durumKod": "DR", "isSaymaSayisi": 1, "oemID": 9762, "urunAciklama": "9-11 KAMPANA İŞLEME", "urunKod": "KAMP01-9-11-6B", "perKod": "AR-GE01", "isSaymaInd": 0, "durNedenKod": "06", "sinyalKritik": true, "emirTarih": "25.06.2025 00:00:00", "sonAyrilmaDk": 5.22611, "perIsim": "ENES VURAL", "oemgerceklesen": 35.0, "onceCevrimSayisi": 15, "isID": 3, "aciklama": "CNC1", "ekBilgi": "", "seq": 1, "oemistenen": 2.0, "id": "CNC01", "durNedenAdi": "AYRILMA", "aktifUretMiktar": 0.0, "isIskMiktar": 0.0, "hatAciklama": "TALASLI IMALAT", "basZamanTS": "26.08.2025 17:30:14", "maxAyrilmaDk": 5.22611}
-        lcd.writeLineIfReady(f"{str_val('urunKod')}", 0, 0)
-        lcd.writeLineIfReady(f"{str_val('perKod')}", 1, 0)
-        lcd.writeLineIfReady(f"U:{int_val('onceUretMiktar')}+{int_val('aktifUretMiktar')} | S:{int_val('isSaymaInd')}/{int_val('isSaymaSayisi')}", 2, 0)
-        lcd.writeLineIfReady(f"D:{str_val('durumKod')}  |  E:{int_val('emirMiktar')}", 3, 0)
         lastTime.updateMainScreen = monotonic()
+        #  {"isNetMiktar": 15.0, "operNo": 8, "isFireMiktar": 0.0, "siradakiIsSayi": 0, "emirNox": "1688", "sonDurTS": "26.08.2025 17:35:28", "duraksamaKritik": false, "hatID": "030", "aktifCevrimSayisi": 0, "atananIsSayi": 1, "sonIslemTS": "26.08.2025 17:30:27", "sabitDuraksamami": 0, "operAciklama": "CNC DİK TORNA", "emirMiktar": 2.0, "operatorCagrimTS": null, "ip": "192.168.2.50", "onceUretMiktar": 15.0, "durumKod": "DR", "isSaymaSayisi": 1, "oemID": 9762, "urunAciklama": "9-11 KAMPANA İŞLEME", "urunKod": "KAMP01-9-11-6B", "perKod": "AR-GE01", "isSaymaInd": 0, "durNedenKod": "06", "sinyalKritik": true, "emirTarih": "25.06.2025 00:00:00", "sonAyrilmaDk": 5.22611, "perIsim": "ENES VURAL", "oemgerceklesen": 35.0, "onceCevrimSayisi": 15, "isID": 3, "aciklama": "CNC1", "ekBilgi": "", "seq": 1, "oemistenen": 2.0, "id": "CNC01", "durNedenAdi": "AYRILMA", "aktifUretMiktar": 0.0, "isIskMiktar": 0.0, "hatAciklama": "TALASLI IMALAT", "basZamanTS": "26.08.2025 17:30:14", "maxAyrilmaDk": 5.22611}
+        lcd.writeLineIfReady(f"{urunKod}", 0, 0)
+        lcd.writeLineIfReady(f"{perKod}", 1, 0)
+        lcd.writeLineIfReady(f"U:{int_val('onceUretMiktar')}+{int_val('aktifUretMiktar')} | S:{int_val('isSaymaSayisi')}/{int_val('isSaymaInd')}", 2, 0)
+        lcd.writeLineIfReady(f"D:{str_val('durumKod')}  |  E:{int_val('emirMiktar')}", 3, 0)
     return True
 def renderAppTitle():
     # from config import app
@@ -152,20 +172,28 @@ async def wsCheckStatusIfNeed():
     if not ws.isConnected(): return False
     if not statusShouldBeChecked(): return False
     try:
-        resp = await ws.wsTalk(api='tekilTezgahBilgi', wsPath='ws/skyMES/makineDurum')
-        if resp:
-            shared.curStatus = resp
+        rec = await ws.wsTalk(api='tekilTezgahBilgi', wsPath='ws/skyMES/makineDurum', timeout=.1)
+        if rec:
+            rec = rec and rec[0] if isinstance(rec, list) else {}
+            shared.curStatus = rec
             shared.lastTime.statusCheck = monotonic()
+            ledDurum = rec.get('ledDurum') if isinstance(rec, dict) else None
+            durumKod = rec.get('durumKod') if isinstance(rec, dict) else None
+            print(f'[DEBUG]  durumKod = [{durumKod}] | ledDurum = [{ledDurum}]')
+            if ledDurum:
+                led.write(ledDurum)
+            elif durumKod is not None:
+                await updateDurumLED(durumKod)
             return True
     except Exception as ex:
         print("[ERROR] wsStatus:", ex)
         print_exception(ex)
     return False
 async def actionsCheckAndExec():
+    # print('actionsCheckAndExec')
     actions = await actionsCheck()
     await actionsExec(actions)
 async def actionsCheck():
-    await asleep(.1)
     localIP = ip2Str(local.ip)
     # print(f'    connected = {connected} | shared._inActionsCheck = {shared._inActionsCheck}')
     if not ws.isConnected():
@@ -178,11 +206,18 @@ async def actionsCheck():
         print('awaiting remote command')
         shared._inActionsCheck = True
     resp = targetIP = actions = None
-    try: resp = await ws.wsRecv()
-    except (OSError, RuntimeError) as ex: resp = None
-    except Exception as ex: print('[ERROR]', 'APP wsRecv:', ex); print_exception(ex)
-    if not resp: return None
-    print(f'rawwset interrupt: {json.dumps(resp)}')
+    try:
+        resp = await ws.wsTalk('readTemp', args={ 'key': 'mes-py', 'stream': True }, timeout=.02)
+    except (OSError, RuntimeError) as ex:
+        resp = None
+    except Exception as ex:
+        print('[ERROR]', 'APP wsRecv:', ex)
+        print_exception(ex)
+    if not resp:
+        return None
+    if isinstance(resp, dict) and bool(resp.get('isError')):
+        return None
+    print(f'actionsCheck interrupt: {json.dumps(resp)}')
     if isinstance(resp, list): resp = { 'actions': resp }
     targetIP = resp.get('ip'); _actions = resp.get('actions')
     if _actions: actions = _actions
@@ -204,30 +239,30 @@ async def actionsExec(actions):
         args = item['args'] if 'args' in item else []
         print('<<     action args:', args)
         try:
-            sleep(.1); busy()
+            busy()
             handler(*args)                                                                                     # ← [js]  handler.call(this, ...args) karşılığı
         except Exception as ex:
             print(f'[ERROR]  handler execution failed: {ex}')
             # await ws.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
     return True
 async def processQueues():
-    global _aborted
     queues = shared.queues; keyQueue = queues.key = queues.key or []
     if not keyQueue:
         return
     for item in keyQueue:
         ts = item.get('ts')
-        if not ts:
-            continue
+        if not ts: continue
         item['tsDiff'] = round((monotonic() - ts) * 1000)
         item.pop('ts', None)
-    result = await ws.wsTalk('fnIslemi', None, keyQueue)
+    print('has queue')
+    result = await ws.wsTalk('fnIslemi', data=keyQueue)
     debug_result = json.dumps(result) if result else '*empty*'
     print(f'    [processQueue] - [fnIslemi] - result: {debug_result})')
     if isinstance(result, dict) and bool(result.get('isError')) == False:
         sentCount = len(keyQueue)
         lcd.writeLineIfReady(f'* [{sentCount}] GITTI', 2, 0)
         keyQueue_clear()
+        await wsCheckStatusIfNeed()
     else:
         lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
 def keyQueue_add(item):
@@ -236,24 +271,44 @@ def keyQueue_add(item):
     return item
 def keyQueue_pop(item):
     queues = shared.queues; keyQueue = queues.key = queues.key or []
-    keyQueue.pop(0)
+    keyQueue.pop()
+    # keyQueue.pop(0)
     return item
 def keyQueue_clear():
     queues = shared.queues; keyQueue = queues.key = queues.key or []
     if keyQueue: keyQueue.clear()
 
+async def updateDurumLED(durumKod):
+    durumKod2Renk = {
+        '': 'SIYAH',
+        'DV': 'YESIL', 'DR': 'SARI',
+        'BK': 'BEYAZ', 'AT': 'MAVI',
+        'MK': 'MAVI'
+    }
+    renk = durumKod2Renk.get(durumKod)
+    if renk:
+        led.write(renk)
 async def onKeyPressed(key):
-    part = activePart()
-    return part.onKeyPressed(key) if part else await onKeyPressed_defaultAction(key)
+    part = activePart(); key = key.lower()
+    return part.onKeyReleased(key, None) if part else await onKeyPressed_defaultAction(key)
+    # return part.onKeyPressed(key) if part else await onKeyPressed_defaultAction(key)
 async def onKeyReleased(key, duration):
-    part = activePart()
-    return part.onKeyReleased(key, duration) if part else await onKeyReleased_defaultAction(key, duration)
+    key = key.lower()
+    # part = activePart()
+    # return part.onKeyReleased(key, duration) if part else await onKeyReleased_defaultAction(key, duration)
 
 async def onKeyPressed_defaultAction(key):
     print(f'{key} press')
-    key = key.lower(); lastTime = shared.lastTime._keySend
-    delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
+    key = key.lower(); lastTime = shared.lastTime._keyPress
+    shared.lastTime._keyPress = monotonic()
+    if lastTime and monotonic() - lastTime <= .05:
+        return False
+    # delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
     lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
+    async def _clear():
+        await asleep(.3)
+        lcd.writeIfReady('        ', lcd.getRows() - 1, lcd.getCols() - 8)
+    thread(_clear)
     lastTime = shared.lastTime._keySend = monotonic()
     # if key == '0':
     #    getMenu('main').run()
@@ -268,25 +323,28 @@ async def onKeyPressed_defaultAction(key):
     else:
         _id = 'secondary' if key == 'enter' else key
         try:
-            await processQueues()
-            if not await ws.wsTalk('fnIslemi', { 'id': _id, 'delayMS': duration }):
+            # if not await ws.wsTalk('fnIslemi', args={ 'id': _id, 'delayMS': duration }, timeout=1):
+            if not await ws.wsTalk('fnIslemi', args={ 'id': _id }):
                 raise RuntimeError()
+            await buzzer.beep(3000, .2)
             # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
-            await asleep(0.1); lcd.clearLineIfReady(lcd.getRows() - 1) 
         except Exception as ex:
             # lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
             print_exception(ex)
             # lcd.writeLineIfReady(f'[{key}] KUYRUGA', 2, 1)
-            keyQueue_add({ 'ts': monotonic(), 'id': _id, 'delayMS': duration })
+            # keyQueue_add({ 'ts': monotonic(), 'id': _id, 'delayMS': duration })
+            keyQueue_add({ 'ts': monotonic(), 'id': _id })
+            await buzzer.beep(500, 1)
+        finally:
+            await wsCheckStatusIfNeed()
     return True
 async def onKeyReleased_defaultAction(key, duration):
     print(f'{key} released | duration = {duration}')
-    key = key.lower()
-    if lastTime and ticks_diff(monotonic(), lastTime) <= 0.3: return False
-    lastTime = keypad._lastKeyPressTime; delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
-    lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
-    lastTime = shared.lastTime._keySend = monotonic()
+    key = key.lower(); lastTime = shared.lastTime._keyRelease
+    shared.lastTime._keyRelease = monotonic()
+    if lastTime and monotonic() - lastTime <= .05:
+        return False
     if key == 'esc' and duration >= 2:
-        from app import updateSelf, reboot
+        from app import reboot
         reboot()
     return True
