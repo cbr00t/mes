@@ -160,8 +160,8 @@ async def updateMainScreen():
         #  {"isNetMiktar": 15.0, "operNo": 8, "isFireMiktar": 0.0, "siradakiIsSayi": 0, "emirNox": "1688", "sonDurTS": "26.08.2025 17:35:28", "duraksamaKritik": false, "hatID": "030", "aktifCevrimSayisi": 0, "atananIsSayi": 1, "sonIslemTS": "26.08.2025 17:30:27", "sabitDuraksamami": 0, "operAciklama": "CNC DİK TORNA", "emirMiktar": 2.0, "operatorCagrimTS": null, "ip": "192.168.2.50", "onceUretMiktar": 15.0, "durumKod": "DR", "isSaymaSayisi": 1, "oemID": 9762, "urunAciklama": "9-11 KAMPANA İŞLEME", "urunKod": "KAMP01-9-11-6B", "perKod": "AR-GE01", "isSaymaInd": 0, "durNedenKod": "06", "sinyalKritik": true, "emirTarih": "25.06.2025 00:00:00", "sonAyrilmaDk": 5.22611, "perIsim": "ENES VURAL", "oemgerceklesen": 35.0, "onceCevrimSayisi": 15, "isID": 3, "aciklama": "CNC1", "ekBilgi": "", "seq": 1, "oemistenen": 2.0, "id": "CNC01", "durNedenAdi": "AYRILMA", "aktifUretMiktar": 0.0, "isIskMiktar": 0.0, "hatAciklama": "TALASLI IMALAT", "basZamanTS": "26.08.2025 17:30:14", "maxAyrilmaDk": 5.22611}
         lcd.writeLineIfReady(f"{urunKod}", 0, 0)
         lcd.writeLineIfReady(f"{perKod}", 1, 0)
-        lcd.writeLineIfReady(f"U:{int_val('onceUretMiktar')}+{int_val('aktifUretMiktar')} | S:{int_val('isSaymaSayisi')}/{int_val('isSaymaInd')}", 2, 0)
-        lcd.writeLineIfReady(f"D:{str_val('durumKod')}  |  E:{int_val('emirMiktar')}", 3, 0)
+        lcd.writeLineIfReady(f"U:{int_val('onceUretMiktar')}+{int_val('aktifUretMiktar')} | S:{int_val('isSaymaInd')}/{int_val('isSaymaSayisi')}", 2, 0)
+        lcd.writeLineIfReady(f"D:{str_val('durumKod')} | E:{int_val('emirMiktar')}", 3, 0)
     return True
 def renderAppTitle():
     # from config import app
