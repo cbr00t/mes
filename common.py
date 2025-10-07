@@ -246,8 +246,7 @@ def getWSUrl(qs = None, wsPath = None, api = None, https = None):
     base = getWSUrlBase(https)
     wsPath = (wsPath if wsPath else srv.wsPath).strip('/ ')
     result = f'{base}/{wsPath}'
-    if api:
-        result += f'/{api}'
+    if api: result += f'/{api}'
     result += f'/?.ip={ip2Str(local.ip)}'
     if qs and isinstance(qs, dict):
         for key, value in qs.items():
@@ -256,6 +255,20 @@ def getWSUrl(qs = None, wsPath = None, api = None, https = None):
                 result += f'={value}'
     print('[DEBUG] wsURL', result)
     return result.rstrip('&')
+def getWSData(api, args = None, data = None, wsPath = None):
+    from config import server as srv
+    mesAPImi = wsPath == 'mes'
+    if data is not None and isinstance(data, (dict, list)):
+        data = json.dumps(data)
+    result = { key: wsPath, 'api': api } if mesAPImi \
+             else { 'ws': wsPath or srv.wsPath, 'api': api }
+    if args:
+        if mesAPImi: result.update(args)
+        else: result['args'] = args
+    if data is not None:
+        result['data'] = { 'data': data }
+    # print('getwsdata', result)
+    return result
 
 def activePart():
     return shared.activePart() if shared.activePart is not None else None
@@ -298,12 +311,4 @@ def statusShouldBeChecked():
     if isBusy(): return False 
     intv = getStatusCheckInterval(); lastTime = shared.lastTime.statusCheck or 0
     return intv and monotonic() - lastTime > intv
-def getWSData(api, args = None, data = None, wsPath = None):
-    from config import server as srv
-    if data is not None and isinstance(data, (dict, list)):
-        data = json.dumps(data)
-    result = { 'ws': wsPath or srv.wsPath, 'api': api }
-    if args: result['args'] = args
-    if data is not None: result['data'] = { 'data': data }
-    # print('getwsdata', result)
-    return result
+

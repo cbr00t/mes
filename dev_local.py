@@ -71,15 +71,17 @@ class Keypad(BaseKeypad):
     def __init__(self, onPressed = None, onReleased = None):
         super().__init__(onPressed, onReleased)
         print('! keypad init')
-    def update(self):
-        super().update();
+    async def update(self):
+        await super().update();
+        await asleep(.2)
+        
         # if keyboard.is_pressed('enter'):
         if False:
             key = input('  > ')
             onPressed = self.onPressed; onReleased = self.onReleased
             self._lastKeyPressTime = monotonic()
             if onPressed: onPressed(key)
-            sleep(0.2)                     # kısa bekleme
+            await asleep(.2)                     # kısa bekleme
             lastTime = self._lastKeyReleaseTime = monotonic()
             if onReleased:
                 duration = monotonic() - lastTime
@@ -145,7 +147,7 @@ def setup_rfid():   dev.rfid   = BaseRFID()
 def setup_buzzer(): dev.buzzer = BaseBuzzer()
 steps = [
     setup_wifi, setup_req, setup_ws, setup_keypad,
-    setup_lcd, setup_led, setup_rfid
+    setup_lcd, setup_led, setup_rfid, setup_buzzer
 ]
 for step in steps:
     step()

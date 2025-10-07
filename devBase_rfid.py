@@ -1,13 +1,15 @@
 ### devBase.py (Ortak Modül)
 from common import *
 # from config import hw
-from mfrc522 import MFRC522
+if isMicroPy():
+    from mfrc522 import MFRC522
 
 class BaseRFID:
     def __init__(self):
         self.lastCard = [0]
-        reader = self.reader = MFRC522(spi_id=0,sck=2,miso=4,mosi=3,cs=1,rst=0)
-        reader.init()
+        reader = self.reader = MFRC522(spi_id=0,sck=2,miso=4,mosi=3,cs=1,rst=0) if isMicroPy() else None
+        if reader is not None:
+            reader.init()
     def reset(self):
         self.lastCard = [0]
         return self

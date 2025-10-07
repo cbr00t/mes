@@ -7,50 +7,54 @@ class AppHandlers:
         dev = self.dev = shared.dev
     
     ## Handler API Interface
-    def exec(self, code):
+    async def exec(self, code):
         result = exec(code, globals())
+        if callable(result):
+            result = result()
+        try: result = await result
+        except: pass
         return result
     def reboot(self):
         import app
         app.reboot()
         return self
-    def updateSelf(self):
+    async def updateSelf(self):
         import app
-        app.updateFiles()
+        await app.updateFiles()
         return self
     def ethIsConnected(self):
         return self.dev.eth.isConnected()
     def wsIsConnected(self):
         return self.dev.ws.isConnected()
-    def wsOpen(self, statusCheckMessage=None):
-        self.dev.ws.open()
+    async def wsOpen(self, statusCheckMessage=None):
+        await self.dev.ws.open()
         return self
-    def wsSend(self, data):
-        self.dev.ws.send(data)
+    async def wsSend(self, data):
+        await self.dev.ws.send(data)
         return self
-    def wsRecv(self, timeout=None):
-        return self.dev.ws.recv(timeout)
-    def wsTalk(self, data, timeout=None):
-        return self.dev.ws.talk(data, timeout)
-    def wsSendJSON(self, data):
-        self.dev.ws.sendJSON(data)
+    async def wsRecv(self, timeout=None):
+        return await self.dev.ws.recv(timeout)
+    async def wsTalk(self, data, timeout=None):
+        return await self.dev.ws.talk(data, timeout)
+    async def wsSendJSON(self, data):
+        await self.dev.ws.sendJSON(data)
         return self
-    def wsRecvJSON(self, timeout=None):
-        return self.dev.ws.recvJSON(timeout)
-    def wsTalkJSON(self, data, timeout=None):
-        return self.dev.ws.talkJSON(data, timeout)
-    def wsClose(self):
-        self.ws.close()
+    async def wsRecvJSON(self, timeout=None):
+        return await self.dev.ws.recvJSON(timeout)
+    async def wsTalkJSON(self, data, timeout=None):
+        return await self.dev.ws.talkJSON(data, timeout)
+    async def wsClose(self):
+        await self.ws.close()
         return self
-    def wsSend(self, api, args = None, data = None, wsPath = None):
-        self.dev.ws.wsSend(api, args, data, wsPath)
+    async def wsSend(self, api, args = None, data = None, wsPath = None):
+        await self.dev.ws.wsSend(api, args, data, wsPath)
         return self
-    def wsRecv(self, timeout=None):
-        return self.dev.ws.wsRecv(timeout)
-    def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
-        return self.dev.ws.wsTalk(api, args, data, wsPath, timeout)
-    def wsHeartbeat(self, timeout=None):
-        return self.dev.ws.wsHeartbeat(timeout)
+    async def wsRecv(self, timeout=None):
+        return await self.dev.ws.wsRecv(timeout)
+    async def wsTalk(self, api, args = None, data = None, wsPath = None, timeout=None):
+        return await self.dev.ws.wsTalk(api, args, data, wsPath, timeout)
+    async def wsHeartbeat(self, timeout=None):
+        return await self.dev.ws.wsHeartbeat(timeout)
     def getWSData(self, api, args = None, data = None, wsPath = None):
         return getWSData(api, args, data, wsPath)
     def wsClose(self):
@@ -86,10 +90,10 @@ class AppHandlers:
     def keypadUpdate(self):
         self.dev.keypad.update()
         return self
-    def rfidRead(self):
-        return self.dev.rfid.read()
-    def beep(self, freq, duration):
-        return self.dev.buzzer.beep(freq, duration)
+    async def rfidRead(self):
+        return await self.dev.rfid.read()
+    async def beep(self, freq, duration):
+        return await self.dev.buzzer.beep(freq, duration)
     def checkStatus(self):
         return self
     def updateStatus(self, result):

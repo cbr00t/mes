@@ -126,7 +126,7 @@ class Part(NS):
         else:
             _clear = True
         if _clear:
-            from app_ovl03 import updateMainScreen
+            from app import updateMainScreen
             out = Part.stdout(); out.clear();
             shared._appTitleRendered = shared._inActionsCheck = False
             shared.lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = None

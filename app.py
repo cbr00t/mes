@@ -41,8 +41,9 @@ async def threadProc():
     global aborted
     while not aborted:
         try:
-            await keypad.update()
-        except ex:
+            if keypad is not None:
+                await keypad.update()
+        except Exception as ex:
             print(ex)
             print('[ERROR]', ex); print_exception(ex)
         await asleep(.5 if isIdle() else .01)
@@ -55,11 +56,6 @@ async def loop():
     if not lcdIsBusy():
         await wsCheckStatusIfNeed()
         await updateMainScreen()
-    if not lastTime.actionsCheck:
-        lastTime.actionsCheck = monotonic()
-    elif monotonic() - lastTime.actionsCheck >= 30:
-        await actionsCheckAndExec()
-        lastTime.actionsCheck = monotonic()
     
 def initDevice():
     print('    init device')
@@ -82,12 +78,14 @@ def initHandlers():
 async def updateSelf():
     lcd.clearLine(3); lcd.write('GUNCELLENIYOR...', 3, 2)
     await asleep(0.5); srv.autoUpdate = True
-    await updateFiles(); reboot()
+    await updateFiles()
+    reboot()
 def reboot():
-    import machine
+    if isMicroPy(): import machine
     print('rebooting...')
     lcd.clearLine(3); lcd.write('REBOOTING...', 3, 2)
-    await asleep(.5); machine.reset()
+    sleep(.5)
+    if isMicroPy(): machine.reset()
 
 async def wifiWait():
     while not wifiCheck():
@@ -144,24 +142,27 @@ async def updateMainScreen():
         return int(value) if isinstance(value, (str, int, float)) else 0
     # print('text = ', text)
     # print('shared._updateMainScreen_lastDebugText = ', shared._updateMainScreen_lastDebugText)
-    urunKod = str_val('urunKod'); perKod = str_val('perKod')
+    urunKod = str_val('urunKod'); perKod = str_val('perKod'); emirMiktar = int_val('emirMiktar')
+    onceUretMiktar = int_val('onceUretMiktar'); aktifUretMiktar = int_val('aktifUretMiktar')
+    isSaymaInd = int_val('isSaymaInd'); isSaymaSayisi = int_val('isSaymaSayisi')
+    durumKod = str_val('durumKod'); 
     if not urunKod:    # empty data
         return False
     hashStr = (
-        f"{urunKod}|{perKod}|{int_val('onceUretMiktar')}|{int_val('aktifUretMiktar')}",
-        f"{int_val('isSaymaInd')}|{int_val('isSaymaSayisi')}|{str_val('durumKod')}|{str_val('emirMiktar')}"
+        f"{urunKod}|{perKod}|{onceUretMiktar}|{aktifUretMiktar}",
+        f"{isSaymaInd}|{isSaymaSayisi}|{durumKod}|{emirMiktar}"
     )
     if hashStr != shared._updateMainScreen_lastHashStr:
-        print(f'status_check cur  hash:  \n  {hashStr}\n')
-        print(f'status_check prev hash:  \n  {shared._updateMainScreen_lastHashStr}\n')
+        print(f'status_check cur  hash:  [{hashStr}]')
+        print(f'status_check prev hash:  [{shared._updateMainScreen_lastHashStr}]')
         shared._updateMainScreen_lastHashStr = hashStr
         shared._updateMainScreen_lastDebugText = text
         lastTime.updateMainScreen = monotonic()
         #  {"isNetMiktar": 15.0, "operNo": 8, "isFireMiktar": 0.0, "siradakiIsSayi": 0, "emirNox": "1688", "sonDurTS": "26.08.2025 17:35:28", "duraksamaKritik": false, "hatID": "030", "aktifCevrimSayisi": 0, "atananIsSayi": 1, "sonIslemTS": "26.08.2025 17:30:27", "sabitDuraksamami": 0, "operAciklama": "CNC DİK TORNA", "emirMiktar": 2.0, "operatorCagrimTS": null, "ip": "192.168.2.50", "onceUretMiktar": 15.0, "durumKod": "DR", "isSaymaSayisi": 1, "oemID": 9762, "urunAciklama": "9-11 KAMPANA İŞLEME", "urunKod": "KAMP01-9-11-6B", "perKod": "AR-GE01", "isSaymaInd": 0, "durNedenKod": "06", "sinyalKritik": true, "emirTarih": "25.06.2025 00:00:00", "sonAyrilmaDk": 5.22611, "perIsim": "ENES VURAL", "oemgerceklesen": 35.0, "onceCevrimSayisi": 15, "isID": 3, "aciklama": "CNC1", "ekBilgi": "", "seq": 1, "oemistenen": 2.0, "id": "CNC01", "durNedenAdi": "AYRILMA", "aktifUretMiktar": 0.0, "isIskMiktar": 0.0, "hatAciklama": "TALASLI IMALAT", "basZamanTS": "26.08.2025 17:30:14", "maxAyrilmaDk": 5.22611}
         lcd.writeLineIfReady(f"{urunKod}", 0, 0)
         lcd.writeLineIfReady(f"{perKod}", 1, 0)
-        lcd.writeLineIfReady(f"U:{int_val('onceUretMiktar')}+{int_val('aktifUretMiktar')} | S:{int_val('isSaymaInd')}/{int_val('isSaymaSayisi')}", 2, 0)
-        lcd.writeLineIfReady(f"D:{str_val('durumKod')} | E:{int_val('emirMiktar')}", 3, 0)
+        lcd.writeLineIfReady(f"U:{onceUretMiktar}+{aktifUretMiktar} | S:{isSaymaInd}/{isSaymaSayisi}", 2, 0)
+        lcd.writeLineIfReady(f"D:{durumKod} | E:{emirMiktar}", 3, 0)
     return True
 def renderAppTitle():
     # from config import app
@@ -172,18 +173,33 @@ async def wsCheckStatusIfNeed():
     if not ws.isConnected(): return False
     if not statusShouldBeChecked(): return False
     try:
-        rec = await ws.wsTalk(api='tekilTezgahBilgi', wsPath='ws/skyMES/makineDurum', timeout=.1)
+        rec = await ws.wsTalk(api='tezgahBilgi', timeout=.5)
         if rec:
-            rec = rec and rec[0] if isinstance(rec, list) else {}
+            rec = rec[0] if isinstance(rec, list) else rec
             shared.curStatus = rec
             shared.lastTime.statusCheck = monotonic()
             ledDurum = rec.get('ledDurum') if isinstance(rec, dict) else None
             durumKod = rec.get('durumKod') if isinstance(rec, dict) else None
+            _exec = rec.get('_exec') if isinstance(rec, dict) else None
             print(f'[DEBUG]  durumKod = [{durumKod}] | ledDurum = [{ledDurum}]')
-            if ledDurum:
-                led.write(ledDurum)
-            elif durumKod is not None:
-                await updateDurumLED(durumKod)
+            print(f'[DEBUG]  _exec = [{_exec}] | ledDurum = [{ledDurum}]')
+            if ledDurum: led.write(ledDurum)
+            elif durumKod is not None: await updateDurumLED(durumKod)
+            if _exec:
+                _exec = json.loads(_exec) if isinstance(_exec, str) else _exec
+                actions = _exec if _exec and isinstance(_exec, dict) and not bool(_exec.get('isError')) else None
+                if actions:
+                    print(f'actionsCheck interrupt: {json.dumps(_exec)}')
+                    if isinstance(actions, list):
+                        actions = { 'actions': _exec }
+                    localIP = ip2Str(local.ip); targetIP = actions.get('ip')
+                    actions = actions.get('actions')
+                    if targetIP and targetIP != localIP:                                                                        # broadcast message match to local ip
+                        print(f'[IGNORE] broadcast message => targetIP: [{targetIP} | localIP: [{localIP}]')
+                        actions = None
+                if actions:
+                    await actionsExec(actions)
+                
             return True
     except Exception as ex:
         print("[ERROR] wsStatus:", ex)
@@ -213,14 +229,13 @@ async def actionsCheck():
     except Exception as ex:
         print('[ERROR]', 'APP wsRecv:', ex)
         print_exception(ex)
-    if not resp:
-        return None
-    if isinstance(resp, dict) and bool(resp.get('isError')):
+    if not resp or (isinstance(resp, dict) and bool(resp.get('isError'))):
         return None
     print(f'actionsCheck interrupt: {json.dumps(resp)}')
     if isinstance(resp, list): resp = { 'actions': resp }
     targetIP = resp.get('ip'); _actions = resp.get('actions')
-    if _actions: actions = _actions
+    if _actions:
+        actions = _actions
     if targetIP and targetIP != localIP:                                                                        # broadcast message match to local ip
         print(f'[IGNORE] broadcast message => targetIP: [{targetIP} | localIP: [{localIP}]')
         actions = None
@@ -240,7 +255,11 @@ async def actionsExec(actions):
         print('<<     action args:', args)
         try:
             busy()
-            handler(*args)                                                                                     # ← [js]  handler.call(this, ...args) karşılığı
+            result = handler(*args)                                                                                     # ← [js]  handler.call(this, ...args) karşılığı
+            if callable(result):
+                result = result(*args)
+            try: result = await result
+            except: pass
         except Exception as ex:
             print(f'[ERROR]  handler execution failed: {ex}')
             # await ws.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })

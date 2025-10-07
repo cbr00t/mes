@@ -7,11 +7,13 @@ class BaseBuzzer:
     def __init__(self):
         self.buzzer = None
     async def beep(self, freq=None, duration=None, pause=None):
+        buzz = self.buzzer
+        if buzz is None:
+            return self
         c = hw.buzzer
         if freq is None: freq = c.freq
         if duration is None: duration = c.duration
         if pause is None: pause = c.pause
-        buzz = self.buzzer
         buzz.freq(freq)           # frekans Hz
         buzz.duty_u16(32768)      # %50 duty cycle
         await asleep(duration)    # calarken bekle
