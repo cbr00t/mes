@@ -62,30 +62,20 @@ class WebSocket(BaseWebSocket):
             print("Connected to", url)
             return True
         except Exception as ex:
-            print("[ERROR] ws open:", ex); print_exception(ex)
+            print("[ERROR] ws open:", ex);
+            print_exception(ex)
             self.ws = None
             return False
 
 # ---------- Keypad Class (Mock) ----------
 class Keypad(BaseKeypad):
-    def __init__(self, onPressed = None, onReleased = None):
-        super().__init__(onPressed, onReleased)
+    def __init__(self):
+        super().__init__()
         print('! keypad init')
-    async def update(self):
-        await super().update();
-        await asleep(.2)
-        
+    def update(self):
+        super().update()
+        sleep(.2)
         # if keyboard.is_pressed('enter'):
-        if False:
-            key = input('  > ')
-            onPressed = self.onPressed; onReleased = self.onReleased
-            self._lastKeyPressTime = monotonic()
-            if onPressed: onPressed(key)
-            await asleep(.2)                     # kısa bekleme
-            lastTime = self._lastKeyReleaseTime = monotonic()
-            if onReleased:
-                duration = monotonic() - lastTime
-                onReleased(key, duration)
         return self
 
 # ---------- LCD Class (Mock) ----------

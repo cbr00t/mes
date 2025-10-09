@@ -91,7 +91,7 @@ class BaseWebSocket:
             if text is None:
                 return None
             self._lastRecv = monotonic()
-            await asleep(.1)
+            await asleep(.05)
             return text
         # except asyncio.TimeoutError:
         #     print('[WARN] ws recv timeout')

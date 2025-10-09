@@ -1,3 +1,4 @@
+from ring_buffer import *
 import json
 import gc
 import sys
@@ -7,16 +8,19 @@ from sys import implementation as impl
 
 if impl.name == 'cpython':    # CPython = (local)
     import threading, traceback, asyncio
+    from time import monotonic
     from asyncio import new_event_loop, set_event_loop
+    import tracemalloc
+    tracemalloc.start()
     def print_exception(e):
         traceback.print_exception(type(e), e, e.__traceback__)
     # --- MicroPython API emülasyonu ---
     def ticks_ms():
         """Return milliseconds since an unspecified point, monotonic."""
-        return int(time.monotonic() * 1000)
+        return int(monotonic() * 1000)
     def ticks_us():
         """Return microseconds since an unspecified point, monotonic."""
-        return int(time.monotonic() * 1_000_000)
+        return int(monotonic() * 1_000_000)
     def ticks_diff(t1, t0=0):
         """Return difference between two tick values."""
         return t1 - t0
@@ -82,8 +86,9 @@ class Shared(NS):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.updateCheck = True
-        self.lastTime = NS(); self._globals = NS()
-        self.queues = NS()
+        self.lastTime = NS()
+        self._globals = NS()
+        self.queues = NS(key = RingBuffer())
         self._base64_alphabet = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 # Functions
@@ -188,29 +193,62 @@ def exists(fname):
         return False
 def async_run(proc, *args, **kwargs):
     if isMicroPy():
-        return asyncio.run(proc(*args, **kwargs))
+        try:
+            return asyncio.run(proc(*args, **kwargs))
+        except KeyboardInterrupt:
+            print("\n[async_run] stopped by user (KeyboardInterrupt)")
+            print_exception(ex)
+        except MemoryError as ex:
+            print("[async_run] memory error:", ex)
+        except Exception as ex:
+            print("[async_run] exception:", ex)
+            print_exception(ex)
+        return  # MicroPython'da loop.close() yok
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(proc(*args, **kwargs))
+    except KeyboardInterrupt:
+        print("\n[async_run] stopped by user (KeyboardInterrupt)")
+        print_exception(ex)
+    except MemoryError as ex:
+        print("[async_run] memory error:", ex)
+    except Exception as ex:
+        print("[async_run] exception:", ex)
+        print_exception(ex)
     finally:
-        loop.close()
+        if isLocalPy():
+            # sadece local CPython'da loop kapatılır
+            loop.close()
 def async_task(proc, *args, **kwargs):
+    """Run coroutine as background task with safe exception logging."""
     async def wrapper():
         try:
             await proc(*args, **kwargs)
         except Exception as ex:
             print(f"[ERROR in {proc.__name__}]", ex)
-            print_exception(ex)
-    return asyncio.create_task(wrapper())
-def thread(proc, *args, **kwargs):
-    """Runs proc in background thread or asyncio task if applicable."""
+            try:
+                print_exception(ex)
+            except Exception:
+                pass
     try:
-        # micropython tarafında sadece asyncio kullanılabilir
-        return asyncio.create_task(proc(*args, **kwargs))
-    except Exception as ex:
-        print("async thread hatası:", ex)
+        return asyncio.create_task(wrapper())
+    except Exception as ex2:
+        print("async_task hata:", ex2)
         raise
+def thread(proc, *args, **kwargs):
+    """Runs new thread in core1"""
+    try:
+        import _thread
+        try:
+            return _thread.start_new_thread(proc, args or (), kwargs)
+        except Exception as ex2:
+            print("thread hatası:", ex2)
+            raise
+    except Exception:
+        # no thread support, asyncio fallback
+        return task(proc, *args, **kwargs)
 # ----------------------------------------------------------------------------- #
 
 

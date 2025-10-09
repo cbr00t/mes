@@ -24,9 +24,10 @@ async def run():
         await buzzer.beep(4000, .1)
     await buzzer.beep(4000, .3)
     print('app started')
-    if keypad is not None:
-        keypad.set_onPressed(shared._onKeyPressed)
-        keypad.set_onReleased(shared._onKeyReleased)
+    # if keypad is not None:
+    #    keypad.set_onPressed(shared._onKeyPressed)
+    #    keypad.set_onReleased(shared._onKeyReleased)
+    # async_task(threadProc)
     thread(threadProc)
     while not aborted:
         try:
@@ -37,16 +38,18 @@ async def run():
     aborted = True
     lcd.clear(); lcd.write('SHUTDOWN', 1,1)
     await ws.close()
-async def threadProc():
+
+def threadProc():
     global aborted
     while not aborted:
         try:
             if keypad is not None:
-                await keypad.update()
+                keypad.update()
         except Exception as ex:
-            print(ex)
-            print('[ERROR]', ex); print_exception(ex)
-        await asleep(.5 if isIdle() else .01)
+            print('[ERROR]', ex)
+            print_exception(ex)
+        sleep(.5 if isIdle() else .01)
+
 async def loop():
     await asleep(1 if isIdle() else .01)
     if not (await wifiCheck() and await connectToServerIfNot()): return
@@ -56,7 +59,7 @@ async def loop():
     if not lcdIsBusy():
         await wsCheckStatusIfNeed()
         await updateMainScreen()
-    
+
 def initDevice():
     print('    init device')
     dev = shared.dev
@@ -265,37 +268,55 @@ async def actionsExec(actions):
             # await ws.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
     return True
 async def processQueues():
-    queues = shared.queues; keyQueue = queues.key = queues.key or []
-    if not keyQueue:
+    queue = shared.queues.key
+    if not queue:
         return
-    for item in keyQueue:
-        ts = item.get('ts')
-        if not ts: continue
-        item['tsDiff'] = round((monotonic() - ts) * 1000)
-        item.pop('ts', None)
-    print('has queue')
-    result = await ws.wsTalk('fnIslemi', data=keyQueue)
-    debug_result = json.dumps(result) if result else '*empty*'
-    print(f'    [processQueue] - [fnIslemi] - result: {debug_result})')
-    if isinstance(result, dict) and bool(result.get('isError')) == False:
-        sentCount = len(keyQueue)
-        lcd.writeLineIfReady(f'* [{sentCount}] GITTI', 2, 0)
-        keyQueue_clear()
-        await wsCheckStatusIfNeed()
-    else:
-        lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
-def keyQueue_add(item):
-    queues = shared.queues; keyQueue = queues.key = queues.key or []
-    keyQueue.append(item)
-    return item
-def keyQueue_pop(item):
-    queues = shared.queues; keyQueue = queues.key = queues.key or []
-    keyQueue.pop()
-    # keyQueue.pop(0)
-    return item
+    recs = []; count = 0
+    while queue:
+        # key, rfid, duration, ts, tsDiff, released
+        rec = queue.pop()
+        key, rfid, duration, ts, _, released = rec
+        if not (key and ts):
+            continue
+        tsDiff = round(ticks_diff(ticks_ms(), ts))
+        recs.append( (key, rfid, duration, ts, tsDiff, released) )
+        count += 1
+    if not count:
+        return
+    print(f'[DEBUG]  {count} keys ready to process')
+    for rec in recs:
+        # key, rfid, duration, ts, tsDiff, released
+        _, _, _, _, _,released = rec
+        func = shared._onKeyReleased if released else _onKeyPressed
+        async def _clear():
+            await asleep(.5)
+            lcd.writeIfReady('        ', lcd.getRows() - 1, lcd.getCols() - 8)
+        async_task(_clear)
+        try:
+            result = func(rec)
+            if hasattr(result, '__await__'):
+                result = await result
+        except Exception as ex:
+            print_exception(ex)
+def keyQueue_push(item):
+    queue = shared.queues.key
+    if not queue:
+        queue = shared.queues.key = RingBuffer()
+    queue.push(item)
+def keyQueue_pop(take=None):
+    queue = shared.queues.key
+    if not queue:
+        return None
+    take = taken = take or 1
+    last = None
+    while queue and taken > 0:
+        last = queue.pop()
+        taken -= 1
+    return last
 def keyQueue_clear():
-    queues = shared.queues; keyQueue = queues.key = queues.key or []
-    if keyQueue: keyQueue.clear()
+    queue = shared.queues.key
+    if queue:
+        queue.clear()
 
 async def updateDurumLED(durumKod):
     durumKod2Renk = {
@@ -307,28 +328,25 @@ async def updateDurumLED(durumKod):
     renk = durumKod2Renk.get(durumKod)
     if renk:
         led.write(renk)
-async def onKeyPressed(key):
-    part = activePart(); key = key.lower()
-    return part.onKeyReleased(key, None) if part else await onKeyPressed_defaultAction(key)
+async def onKeyPressed(rec):
+    key, = rec; part = activePart()
+    return part.onKeyReleased(key, None) if part else await onKeyPressed_defaultAction(rec)
     # return part.onKeyPressed(key) if part else await onKeyPressed_defaultAction(key)
-async def onKeyReleased(key, duration):
-    key = key.lower()
+async def onKeyReleased(rec):
+    await onKeyReleased_defaultAction(rec)
     # part = activePart()
     # return part.onKeyReleased(key, duration) if part else await onKeyReleased_defaultAction(key, duration)
 
-async def onKeyPressed_defaultAction(key):
+async def onKeyPressed_defaultAction(rec):
+    key, rfid, duration, ts, tsDiff = rec
     print(f'{key} press')
     key = key.lower(); lastTime = shared.lastTime._keyPress
     shared.lastTime._keyPress = monotonic()
-    if lastTime and monotonic() - lastTime <= .05:
+    if lastTime and ticks_diff(ticks_ms(), lastTime) < 100:
         return False
     # delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
     lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
-    async def _clear():
-        await asleep(.3)
-        lcd.writeIfReady('        ', lcd.getRows() - 1, lcd.getCols() - 8)
-    thread(_clear)
-    lastTime = shared.lastTime._keySend = monotonic()
+    shared.lastTime._keySend = monotonic()
     # if key == '0':
     #    getMenu('main').run()
     if key == 'f1':
@@ -343,7 +361,8 @@ async def onKeyPressed_defaultAction(key):
         _id = 'secondary' if key == 'enter' else key
         try:
             # if not await ws.wsTalk('fnIslemi', args={ 'id': _id, 'delayMS': duration }, timeout=1):
-            if not await ws.wsTalk('fnIslemi', args={ 'id': _id }):
+            args = { 'id': _id, 'duration': None, 'ts': ts, 'tsDiff': tsDiff, 'released': False }
+            if not await ws.wsTalk('fnIslemi', args=args):
                 raise RuntimeError()
             await buzzer.beep(3000, .2)
             # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
@@ -351,17 +370,22 @@ async def onKeyPressed_defaultAction(key):
             # lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
             print_exception(ex)
             # lcd.writeLineIfReady(f'[{key}] KUYRUGA', 2, 1)
-            # keyQueue_add({ 'ts': monotonic(), 'id': _id, 'delayMS': duration })
-            keyQueue_add({ 'ts': monotonic(), 'id': _id })
+            # keyQueue_push({  'ts': monotonic(), 'id': _id, 'delayMS': duration })
+            item = (
+                # key, rfid, duration, ts, tsDiff, released
+                _id, rfid, duration, ticks_ms(), None, False
+            )
+            keyQueue_push(item)
             await buzzer.beep(500, 1)
         finally:
             await wsCheckStatusIfNeed()
     return True
-async def onKeyReleased_defaultAction(key, duration):
+async def onKeyReleased_defaultAction(rec):
+    key, _, duration = rec
     print(f'{key} released | duration = {duration}')
     key = key.lower(); lastTime = shared.lastTime._keyRelease
     shared.lastTime._keyRelease = monotonic()
-    if lastTime and monotonic() - lastTime <= .05:
+    if lastTime and ticks_diff(ticks_ms(), lastTime) < 50:
         return False
     if key == 'esc' and duration >= 2:
         from app import reboot

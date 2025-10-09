@@ -2,15 +2,16 @@
 from common import *
 from config import local, server as srv, hw
 from devBase import *
-import urequests
 import socket
-from machine import Pin, I2C, PWM
-from network import WLAN, STA_IF
-import rp2
-from pico_i2c_lcd import I2cLcd
-# from lcd_api import LcdApi
-from neopixel_pio import Neopixel2
-from mpy_websocket import client as _ws_client
+if isMicroPy():
+    import urequests
+    from machine import Pin, I2C, PWM
+    from network import WLAN, STA_IF
+    import rp2
+    from pico_i2c_lcd import I2cLcd
+    # from lcd_api import LcdApi
+    from neopixel_pio import Neopixel2
+    from mpy_websocket import client as _ws_client
 
 # # Birkaç farklı paket ismi olabildiği için esnek import:
 # _ws_client = None
@@ -90,100 +91,82 @@ class WebSocket(BaseWebSocket):
 
 # ---------- Keypad Control Class ----------
 class Keypad(BaseKeypad):
-    @property
-    def pressed_keys(self):
-        """Basılı tuş etiketlerini liste olarak döndürür."""
-        st = self._debounced()
-        out = []
-        for r in range(self._rlen):
-            for c in range(self._clen):
-                if not st[r][c]: continue
-                lab = self._labels[r][c]
-                if not lab: continue 
-                out.append(lab)
-                if not self._multi: return [lab]
-        return out
-    
     """
-    rows:  OUTPUT pin numaraları (ör. [12,13,14,15])
-    cols:  INPUT_PULLUP pin numaraları (ör. [7,8,9,10,11])
-    labels:  row x col string etiket matrisi (None geçersiz tuş)
+    rows:   OUTPUT pin numaraları (ör. [12,13,14,15])
+    cols:   INPUT_PULLUP pin numaraları (ör. [7,8,9,10,11])
+    labels: (row x col) string etiket matrisi (None geçersiz tuş)
     """
-    def __init__(self, onPressed = None, onReleased = None):
-        super().__init__(onPressed, onReleased)
-        c = hw.keypad
-        self._aborted = False
-        self._last = []
-        _rows = self._rows = [Pin(p, Pin.OUT, value=1) for p in c.rows]              # PASIF HIGH
-        _cols = self._cols = [Pin(p, Pin.IN, Pin.PULL_UP) for p in c.cols]
-        self._rlen = len(_rows)
-        self._clen = len(_cols)
-        self._labels = c.keys
-        self._debounce = c.debounce_ms
-        self._multi = c.multi
-
-        # Debounce durumları
-        self._stable = [[False] * self._clen for _ in range(self._rlen)]
-        self._last_read = [[False] * self._clen for _ in range(self._rlen)]
-        self._last_change = [[0] * self._clen for _ in range(self._rlen)]
-    def abort(self):
-        self._aborted = True
-        return self
-    async def loop(self):
-        await super().loop()
-        # t0 = time.ticks_ms()
-        # while time.ticks_diff(time.ticks_ms(), t0) < duration * 1000:
-        while not self._aborted:
-            self.update()
-            await asleep(.05)
-        self._aborted = False
-        return self
-    async def update(self):
-        await super().update()
-        last = self._last
+    def __init__(self):
+        super().__init__()
+    def update(self):
+        super().update(); s = self.state
         try:
-            pressed = self.pressed_keys                                     # Liste (sıralı)
-            if pressed:
-                # --- yeni basılanlar (sırayla, tekrar etmeden)
-                lastTime = monotonic()
-                for key in pressed:
-                    if key in last: continue
-                    if self.onPressed: await self.onPressed(key)
-                self._lastKeyPressTime = lastTime
-            if last:
-                # --- bırakılanlar (önceden vardı ama şimdi yok)
-                lastTime = monotonic()
-                for key in last:
-                    if key in pressed: continue
-                    duration = monotonic() - self._lastKeyPressTime
-                    if self.onReleased: await self.onReleased(key, duration)
-                self._lastKeyReleaseTime = lastTime
-            last = self._last = pressed  # mevcut durumu kaydet
+            l = this.getKeyState()
+            key = l[0]; _ts = l[1]
+            _tsDiff = l[2]; released = l[3]
+            if not (key and time):
+                return False
+            rec = (
+                # key, rfid, duration, ts, tsDiff, released
+                key, None, None, _ts, _tsDiff, released
+            )
+            shared.queues.key.push(rec)
+            return True
         except Exception as ex:
             print("Keypad tarama hatası:", ex)
             print_exception(ex)
-    def _scan_raw(self):
-        """True=basılı, False=serbest"""
-        state = [[False]*self._clen for _ in range(self._rlen)]
-        for r, rpin in enumerate(self._rows):
-            rpin.value(0)      # o satırı aktif et (LOW)
-            sleep_us(10)       # kısa stabilizasyon
-            for c, cpin in enumerate(self._cols):
-                # Pull-up var; LOW -> tuş basılı
-                state[r][c] = (cpin.value() == 0)
-            rpin.value(1)      # pasif (HIGH)
-        return state
-    def _debounced(self):
-        raw = self._scan_raw()
-        now = ticks_ms()
-        for r in range(self._rlen):
-            for c in range(self._clen):
-                if raw[r][c] != self._last_read[r][c]:
-                    self._last_read[r][c] = raw[r][c]
-                    self._last_change[r][c] = now
-                elif time.ticks_diff(now, self._last_change[r][c]) >= self._debounce:
-                    self._stable[r][c] = self._last_read[r][c]
-        return self._stable
+    def scanKeyState(self):
+        """ (released, key) or None """
+        LO = 0; HI = 1
+        s = self.state; l = s.last
+        pinRows, pinCols = s.pin
+        rngRows, rngCols = s.rng
+        debounce_ms = s.debounce_ms
+        lbl.labels
+        r = 0; c = None
+        for rPin in pinRows:
+            rPin.value(LO)                    # activate row
+            sleep_us(5)                       # kısa stabilizasyon
+            c = 0
+            for cPin in pinCols:
+                pressed = cpin.value() == LO
+                if pressed:
+                    key, _time = l
+                    _now = ticks_ms()
+                    ok = not(key and _time)   # (key VE zaman hiç yoksa)
+                                              # debounce_ms kullanılır ise de ==> (zaman farkı > debounce_ms) ise (tuş titreşim kontrolü)
+                    ok = ok and (not debounce_ms or ticks_diff(_now, _time) > debounce_ms)
+                    if ok:
+                        # last = [key, time, tsDiff, released]
+                        l[0] = lbl[r][c]
+                        l[1] = _now
+                        l[2] = None
+                        l[3] = False
+                    return l
+                elif l.key == lbl[r][c]:
+                    _now = ticks_ms(); _time = l.time
+                    _tsDiff = ticks_diff(_now, _time)
+                    if _tsDiff > (debounce_ms or 0):
+                        # l[0] = lbl[r][c]
+                        l[1] = _now
+                        l[2] = _tsDiff
+                        l[3] = True
+                    else:
+                        l[0] = l[1] = l[2] = l[3] = None
+                c += 1
+            rpin.value(HI)                    # deactivate row
+            r += 1
+        return None
+    def abort(self):
+        self._aborted = True
+        return self
+    @property
+    def bounced(self):
+        s = self.state; min_ms = s.debounce_ms;
+        if not min_ms:
+            return False
+        last = s.last; key = last.key; _time = last.time
+        return key and _time and ticks_diff(ticks_ms(), _time) <= min_ms
 
 # ---------- LCD Control Class ----------
 class LCD(BaseLCD):
