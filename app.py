@@ -46,6 +46,10 @@ def threadProc():
         try:
             if keypad is not None:
                 keypad.update()
+        except KeyboardInterrupt as ex:
+            aborted = True
+            print("\n[thread] stopped by user (KeyboardInterrupt)")
+            return
         except Exception as ex:
             print('[ERROR]', ex)
             print_exception(ex)

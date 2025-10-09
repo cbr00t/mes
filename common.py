@@ -197,7 +197,6 @@ def async_run(proc, *args, **kwargs):
             return asyncio.run(proc(*args, **kwargs))
         except KeyboardInterrupt:
             print("\n[async_run] stopped by user (KeyboardInterrupt)")
-            print_exception(ex)
         except MemoryError as ex:
             print("[async_run] memory error:", ex)
         except Exception as ex:
@@ -209,9 +208,8 @@ def async_run(proc, *args, **kwargs):
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(proc(*args, **kwargs))
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as ex:
         print("\n[async_run] stopped by user (KeyboardInterrupt)")
-        print_exception(ex)
     except MemoryError as ex:
         print("[async_run] memory error:", ex)
     except Exception as ex:
