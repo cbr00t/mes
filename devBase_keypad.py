@@ -22,8 +22,8 @@ class BaseKeypad:
             labels = c.keys,
             debounce_ms = c.debounce_ms,
             last = [
-                # key, time, released
-                None, 0, False
+                # key, ts, lastTS, released
+                None, None, None, False
             ],
             pin = (
                 # row, col
@@ -41,4 +41,22 @@ class BaseKeypad:
         )
         pass
     def update(self):
+        s = self.state
+        try:
+            l = self.scanKeyState()
+            key = l[0]; _ts = l[1]
+            _tsDiff = l[2]; released = l[3]
+            if not (key and time):
+                return False
+            rec = (
+                # key, rfid, duration, ts, tsDiff, released
+                key, None, None, _ts, _tsDiff, released
+            )
+            shared.queues.key.push(rec)
+            return True
+        except Exception as ex:
+            print("Keypad tarama hatası:", ex)
+            print_exception(ex)
         return self
+    def scanKeyState(self):
+        return None

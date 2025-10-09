@@ -99,24 +99,10 @@ class Keypad(BaseKeypad):
     def __init__(self):
         super().__init__()
     def update(self):
-        super().update(); s = self.state
-        try:
-            l = this.getKeyState()
-            key = l[0]; _ts = l[1]
-            _tsDiff = l[2]; released = l[3]
-            if not (key and time):
-                return False
-            rec = (
-                # key, rfid, duration, ts, tsDiff, released
-                key, None, None, _ts, _tsDiff, released
-            )
-            shared.queues.key.push(rec)
-            return True
-        except Exception as ex:
-            print("Keypad tarama hatası:", ex)
-            print_exception(ex)
+        super().update()
     def scanKeyState(self):
         """ (released, key) or None """
+        super().scanKeyState()
         LO = 0; HI = 1
         s = self.state; l = s.last
         pinRows, pinCols = s.pin

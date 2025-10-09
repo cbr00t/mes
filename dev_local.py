@@ -77,6 +77,16 @@ class Keypad(BaseKeypad):
         sleep(.2)
         # if keyboard.is_pressed('enter'):
         return self
+    def scanKeyState(self):
+        """ (released, key) or None """
+        super().scanKeyState()
+        l = self.state.last
+        # last = [key, time, tsDiff, released]
+        l[0] = 'enter'
+        l[1] = ticks_ms()
+        l[2] = None
+        l[3] = False
+        return l
 
 # ---------- LCD Class (Mock) ----------
 class LCDCtl(BaseLCD):

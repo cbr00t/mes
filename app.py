@@ -287,7 +287,7 @@ async def processQueues():
     for rec in recs:
         # key, rfid, duration, ts, tsDiff, released
         _, _, _, _, _,released = rec
-        func = shared._onKeyReleased if released else _onKeyPressed
+        func = getattr(shared, '_onKeyReleased' if released else '_onKeyPressed')
         async def _clear():
             await asleep(.5)
             lcd.writeIfReady('        ', lcd.getRows() - 1, lcd.getCols() - 8)
@@ -329,7 +329,8 @@ async def updateDurumLED(durumKod):
     if renk:
         led.write(renk)
 async def onKeyPressed(rec):
-    key, = rec; part = activePart()
+    key,_,_,_,_,_ = rec
+    part = activePart()
     return part.onKeyReleased(key, None) if part else await onKeyPressed_defaultAction(rec)
     # return part.onKeyPressed(key) if part else await onKeyPressed_defaultAction(key)
 async def onKeyReleased(rec):
@@ -338,7 +339,7 @@ async def onKeyReleased(rec):
     # return part.onKeyReleased(key, duration) if part else await onKeyReleased_defaultAction(key, duration)
 
 async def onKeyPressed_defaultAction(rec):
-    key, rfid, duration, ts, tsDiff = rec
+    key, rfid, duration, ts, tsDiff, _ = rec
     print(f'{key} press')
     key = key.lower(); lastTime = shared.lastTime._keyPress
     shared.lastTime._keyPress = monotonic()
