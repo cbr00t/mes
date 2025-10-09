@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 5)
+    version                         = (1, 1, 6)
 )
 
 
@@ -68,7 +68,9 @@ hw = NS(
             ['f3', '7', '8', '9', 'down'],
             ['f4', 'esc', '0', 'enter', None]
         ],
-        debounce_ms = 10
+        debounce_ms = 10,
+        scan_interval_ms = 50,
+        simulation_interval_ms = 1500
     ),
     lcd = NS(
         rows = int(4), cols = int(20),

@@ -175,13 +175,15 @@ class LCD(BaseLCD):
     def clear(self):
         super().clear()
         self.lcd.clear()
-        print("lcdClear")
+        if isLocalPy():
+            print("lcdClear")
         return self
     def write(self, data, row=0, col=0, _internal=False):
         super().write(data, row, col, _internal)
         self.move(row, col)
         self.lcd.putstr(data)
-        print("lcdWrite:", data)
+        if isLocalPy():
+            print("lcdWrite:", data)
         return self
     def move(self, row=0, col=0):
         super().move(row, col)

@@ -1,5 +1,5 @@
 from common import *
-from config import local, server as srv
+from config import local, server, hw as srv
 from update import *
 from menu import SubMenu, MenuItem
 from app_infoPart import *
@@ -41,6 +41,7 @@ async def run():
 
 def threadProc():
     global aborted
+    scan_interval_secs = (hw.keypad.scan_interval_ms or 10) / 1000
     while not aborted:
         try:
             if keypad is not None:
@@ -48,7 +49,7 @@ def threadProc():
         except Exception as ex:
             print('[ERROR]', ex)
             print_exception(ex)
-        sleep(.5 if isIdle() else .01)
+        sleep(scan_interval_secs * 20 if isIdle() else scan_interval_secs)
 
 async def loop():
     await asleep(1 if isIdle() else .01)
@@ -69,7 +70,8 @@ def initDevice():
         print(f'Device Module = {modName_device}')
         dynImport(f'dev_{modName_device}', 'mod_dev')
         print(f'    import dev_{modName_device} as mod_dev')
-        dev = shared.dev; print(f'    dev: {dev}')
+        dev = shared.dev
+        print(f'    dev: {dev}')
     return dev
 def initHandlers():
     print('    init handlers')

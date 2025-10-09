@@ -54,7 +54,7 @@ class BaseLCD:
             line = lines[row]
             segment = line[col:col + len(data)]
         if segment.strip() == data.strip():
-            print(f'!! same lcd line segment: [{data}]')
+            # print(f'!! same lcd line segment: [{data}]')
             return self
         if col > 0:
             _data = ' ' * (col - 1)

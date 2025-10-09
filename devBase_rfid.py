@@ -26,8 +26,8 @@ class BaseRFID:
         if stat != reader.OK:
             self.reset()
             return None        
-        print('debug6')
-        print("Card detected {}  uid={}".format(hex(int.from_bytes(bytes(uid),"little",False)).upper(),reader.tohexstring(uid)))
+        # print('debug6')
+        print("Card detected {}  uid={}".format(hex(int.from_bytes(bytes(uid),"little",False)).upper(), reader.tohexstring(uid)))
         if reader.IsNTAG():
             print("Got NTAG{}".format(reader.NTAG))
             reader.MFRC522_Dump_NTAG(Start=0, End=reader.NTAG_MaxPage)

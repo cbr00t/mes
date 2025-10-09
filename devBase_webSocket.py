@@ -28,7 +28,8 @@ class BaseWebSocket:
                 print("! ws_open", url)
             return ok
         except Exception as ex:
-            print("[ERROR] ws open:", ex); print_exception(ex)
+            print("[ERROR] ws open:", ex)
+            print_exception(ex)
             await self.close()
             return False
     async def _open(self):

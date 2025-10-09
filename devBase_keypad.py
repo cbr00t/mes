@@ -46,7 +46,7 @@ class BaseKeypad:
             l = self.scanKeyState()
             key = l[0]; _ts = l[1]
             _tsDiff = l[2]; released = l[3]
-            if not (key and time):
+            if not (key and _ts):
                 return False
             rec = (
                 # key, rfid, duration, ts, tsDiff, released

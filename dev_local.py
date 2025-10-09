@@ -74,7 +74,8 @@ class Keypad(BaseKeypad):
         print('! keypad init')
     def update(self):
         super().update()
-        sleep(.2)
+        simulation_interval_secs = (hw.keypad.simulation_interval_ms or 200) / 1000
+        sleep(simulation_interval_secs)
         # if keyboard.is_pressed('enter'):
         return self
     def scanKeyState(self):
