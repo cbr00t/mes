@@ -73,11 +73,11 @@ class Keypad(BaseKeypad):
         super().__init__()
         print('! keypad init')
     def update(self):
-        super().update()
-        simulation_interval_secs = (hw.keypad.simulation_interval_ms or 200) / 1000
-        sleep(simulation_interval_secs)
-        # if keyboard.is_pressed('enter'):
-        return self
+        simulation_interval_ms = hw.keypad.simulation_interval_ms
+        if not simulation_interval_ms:
+            return False
+        sleep(simulation_interval_ms / 1000)
+        return super().update()
     def scanKeyState(self):
         """ (released, key) or None """
         super().scanKeyState()
@@ -90,7 +90,7 @@ class Keypad(BaseKeypad):
         return l
 
 # ---------- LCD Class (Mock) ----------
-class LCDCtl(BaseLCD):
+class LCD(BaseLCD):
     def __init__(self):
         super().__init__()
         print('! lcd init')
@@ -121,17 +121,39 @@ class LCDCtl(BaseLCD):
         print('\n')  # print('\033[2J')
         return super()._printBuffer()
 
-class LEDCtl(BaseLED):
+class LED(BaseLED):
     def __init__(self):
         super().__init__()
+        c = hw.led
+        self.brightness(c.brightness)
         print('! led init')
-    def write(self, rgb, col):
-        return super().write(rgb, col)
+    def _write(self, value):
+        super()._write(value)
+        l = self.state.last
+        print('[LED] ', value, join(' | ', l))
+    def brightness(self, value):
+        super().brightness(value)
+        l = self.state.last
+        print('[LED] ', value, join(' | ', l))
 
-class RFIDCtl(BaseRFID):
+class RFID(BaseRFID):
     def __init__(self):
         super().__init__()
         print('! rfid init')
+    def update(self):
+        simulation_interval_ms = hw.rfid.simulation_interval_ms
+        if not simulation_interval_ms:
+            return False
+        sleep(simulation_interval_ms / 1000)
+        return super().update()
+    def read(self):
+        super().read()
+        s = self.state; l = s.last
+        uid = int.from_bytes(bytes([0x0C, 0x0B, 0x03, 0x00]), 'little')
+        # rfid, ts
+        l[0] = uid
+        l[1] = ticks_ms()
+        return uid2Str(uid)
 
 
 # ---------- Device Initialization ----------
@@ -142,9 +164,9 @@ def setup_req():    dev.req    = WebReq()
 # def setup_sock():   dev.sock   = RawSocket()
 def setup_ws():     dev.ws     = WebSocket()
 def setup_keypad(): dev.keypad = Keypad()
-def setup_lcd():    dev.lcd    = BaseLCD()
-def setup_led():    dev.led    = BaseLED()
-def setup_rfid():   dev.rfid   = BaseRFID()
+def setup_lcd():    dev.lcd    = LCD()
+def setup_led():    dev.led    = LED()
+def setup_rfid():   dev.rfid   = RFID()
 def setup_buzzer(): dev.buzzer = BaseBuzzer()
 steps = [
     setup_wifi, setup_req, setup_ws, setup_keypad,

@@ -44,6 +44,7 @@ elif impl.name == 'micropython':
     from asyncio import sleep as asleep, sleep_ms as asleep_ms
     from time import ticks_diff, ticks_ms, sleep_ms, sleep_us
     from sys import print_exception
+    from machine import disable_irq, enable_irq
     def monotonic():
         return ticks_ms() / 1000
 
@@ -79,10 +80,11 @@ class NS:
     def __repr__(self):
         attrs = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())
         return f'NS({attrs})'
+
 class Shared(NS):
     @classmethod
     def getInstVars(cls):
-        return super().getInstVars() + ['dev', 'activePart']
+        return super().getInstVars() + ['dev', 'activePart', '_inCritical']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.updateCheck = True
@@ -141,11 +143,24 @@ def substring(s, start, end=None):
     if end is None:
         return s[start:]
     return s[start:end]
-def uidToString(uid):
-    result = ''
-    for i in uid:
-        result = "%02X" % i + result
-    return result
+# def uid2Str(uid):
+#    result = ''
+#    for i in uid:
+#        result = "%02X" % i + result
+#    return result
+def uid2Str(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        value = bytes(value)
+    if isinstance(value, bytes):
+        value = int.from_bytes(value, 'little')
+    return f'{value:08X}'
+    return f'{value:X}'
+def join(delim, *values):
+    return delim.join('' if v is None else str(v) for v in values)
 def withErrCheckEx(func, exClass):
     def wrapper(*args, **kwargs):
         try:
@@ -165,6 +180,24 @@ def safeImport(name, as_ = None):
     except Exception as ex:
         print(f"[ModuleError] {name} import failed:", ex)
         return None
+def critical(proc, *args, **kwargs):
+    if shared._inCritical:
+        return proc(*args, **kwargs)
+    shared._inCritical = True
+    state = cli()
+    try:
+        return proc(*args, **kwargs)
+    finally:
+        sti(state)
+        shared._inCritical = False
+def cli():
+    state = disable_irq()
+    gc.disable()
+    return state
+def sti(irq_state = None):
+    enable_irq(irq_state)
+    gc.collect()
+    gc.enable()
 def isWindows():
     import os
     return os.name == 'nt'       # Windows
@@ -348,3 +381,17 @@ def statusShouldBeChecked():
     intv = getStatusCheckInterval(); lastTime = shared.lastTime.statusCheck or 0
     return intv and monotonic() - lastTime > intv
 
+
+
+if not 'Pin' in globals():
+    class Pin:
+        IN = 0; OUT = 1
+        PULL_UP = 0; PULL_DOWN = 1
+        def __init__(self, num, in_out = IN, value = IN):
+            self.num = num
+            self.in_out = in_out
+            self._value = value
+        @property
+        def value(val=None):
+            if val is None: return val
+            self._value = val

@@ -5,6 +5,10 @@ from config import hw
 
 class BaseLED:
     def __init__(self):
+        self.state = NS(
+            # led, brightness
+            last = [None, 0]
+        )
         pass
     def write(self, color):
         if isinstance(color, str):
@@ -24,11 +28,22 @@ class BaseLED:
             )
         if color is None:
             raise Exception(f'Renk değeri hatalı: [{color}]')
-        return self._write(color)
+        l = self.state.last
+        if color == l[0]:
+            return self
+        result = self._write(color)
+        l[0] = color
+        return result
     def _write(self, color):
         return self
     def clear(self):
         self.write('SIYAH')
         return self
     def brightness(self, value):
+        result = self._brightness(value)
+        l = self.state.last
+        if value is not None:
+            l[1] = value
+        return result
+    def _brightness(self, value):
         return self

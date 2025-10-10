@@ -12,6 +12,7 @@ if isMicroPy():
     # from lcd_api import LcdApi
     from neopixel_pio import Neopixel2
     from mpy_websocket import client as _ws_client
+    from mfrc522 import MFRC522
 
 # # Birkaç farklı paket ismi olabildiği için esnek import:
 # _ws_client = None
@@ -30,8 +31,9 @@ if isMicroPy():
 class WiFi(BaseWiFi):
     def __init__(self):
         super().__init__()
-        wlan = self.wlan = WLAN(STA_IF)
-        wlan.active(True)
+        wlan = self.wlan = WLAN(STA_IF) if 'WLAN' in globals() else None
+        if wlan:
+            wlan.active(True)
         try:
             import rp2
             rp2.country('TR')   # ülke seçimi (varsa)
@@ -101,21 +103,24 @@ class Keypad(BaseKeypad):
     def update(self):
         super().update()
     def scanKeyState(self):
-        """ (released, key) or None """
         super().scanKeyState()
+        return critical(self._scanKeyState)
+    def _scanKeyState(self):
+        """ (released, key) or None """
+        super()._scanKeyState()
         LO = 0; HI = 1
         s = self.state; l = s.last
         pinRows, pinCols = s.pin
         rngRows, rngCols = s.rng
         debounce_ms = s.debounce_ms
-        lbl.labels
+        lbl = s.labels
         r = 0; c = None
         for rPin in pinRows:
             rPin.value(LO)                    # activate row
             sleep_us(5)                       # kısa stabilizasyon
             c = 0
             for cPin in pinCols:
-                pressed = cpin.value() == LO
+                pressed = cPin.value() == LO
                 if pressed:
                     key, _time = l
                     _now = ticks_ms()
@@ -129,8 +134,8 @@ class Keypad(BaseKeypad):
                         l[2] = None
                         l[3] = False
                     return l
-                elif l.key == lbl[r][c]:
-                    _now = ticks_ms(); _time = l.time
+                elif l[0] == lbl[r][c]:
+                    _now = ticks_ms(); _time = l[1]
                     _tsDiff = ticks_diff(_now, _time)
                     if _tsDiff > (debounce_ms or 0):
                         # l[0] = lbl[r][c]
@@ -140,19 +145,19 @@ class Keypad(BaseKeypad):
                     else:
                         l[0] = l[1] = l[2] = l[3] = None
                 c += 1
-            rpin.value(HI)                    # deactivate row
+            rPin.value(HI)                    # deactivate row
             r += 1
         return None
     def abort(self):
         self._aborted = True
         return self
-    @property
-    def bounced(self):
-        s = self.state; min_ms = s.debounce_ms;
-        if not min_ms:
-            return False
-        last = s.last; key = last.key; _time = last.time
-        return key and _time and ticks_diff(ticks_ms(), _time) <= min_ms
+    # @property
+    # def is_bounced(self):
+    #     s = self.state; min_ms = s.debounce_ms;
+    #     if not min_ms:
+    #         return False
+    #     last = s.last; key = last.key; _time = last.time
+    #     return key and _time and ticks_diff(ticks_ms(), _time) <= min_ms
 
 # ---------- LCD Control Class ----------
 class LCD(BaseLCD):
@@ -166,15 +171,16 @@ class LCD(BaseLCD):
         print(f'addr = {addr}')
         print(f'c.rows = {c.rows}')
         print(f'c.cols = {c.cols}')
-        i2c = self.i2c = I2C(c._id, scl=Pin(c.scl), sda=Pin(c.sda), freq=c.freq)
-        lcd = self.lcd = I2cLcd(i2c, addr, c.rows, c.cols)
+        i2c = self.i2c = I2C(c._id, scl=Pin(c.scl), sda=Pin(c.sda), freq=c.freq) if 'I2C' in globals() else None
+        lcd = self.lcd = I2cLcd(i2c, addr, c.rows, c.cols) if 'I2cLcd' in globals() else None
         self.unblink()
         self.showCursor()
         self.clear()
         # lcd.hal_write_command(lcd.LCD_ENTRY_MODE)
     def clear(self):
-        super().clear()
-        self.lcd.clear()
+        super().clear(); lcd = self.lcd
+        if lcd:
+            lcd.clear()
         if isLocalPy():
             print("lcdClear")
         return self
@@ -198,20 +204,24 @@ class LCD(BaseLCD):
         self.lcd.backlight_off()
         return self
     def blink(self):
-        super().blink()
-        self.lcd.blink_cursor_on()
+        super().blink(); lcd = self.lcd
+        if lcd:
+            lcd.blink_cursor_on()
         return self
     def unblink(self):
-        super().unblink()
-        self.lcd.blink_cursor_off()
+        super().unblink(); lcd = self.lcd
+        if lcd:
+            lcd.blink_cursor_off()
         return self
     def showCursor(self):
-        super().showCursor()
-        self.lcd.show_cursor()
+        super().showCursor(); lcd = self.lcd
+        if lcd:
+            lcd.show_cursor()
         return self
     def hideCursor(self):
-        super().hideCursor()
-        self.lcd.hide_cursor()
+        super().hideCursor(); lcd = self.lcd
+        if lcd:
+            lcd.hide_cursor()
         return self
 
 class LED(BaseLED):
@@ -219,7 +229,7 @@ class LED(BaseLED):
         super().__init__()
         c = hw.led
         # SM0, pin=GP1, renk sırası GRB
-        strip = self.strip = Neopixel2(c.count, 0, c.pin, "GRB")
+        strip = self.strip = Neopixel2(c.count, 0, c.pin, "GRB") if 'Neopixel2' in globals() else None
         self.brightness(c.brightness)
         pass
     def _write(self, color):
@@ -232,20 +242,72 @@ class LED(BaseLED):
         super().clear()
         self.strip.clear()
         return self
-    def brightness(self, value):
-        super().brightness(value)
-        self.strip.brightness(value)
+    def _brightness(self, value):
+        super()._brightness(value); strip = self.strip
+        if strip:
+            strip.brightness(value)
         return self
 
 class RFID(BaseRFID):
     def __init__(self):
         super().__init__()
+        reader = self.reader = MFRC522(spi_id=0,sck=2,miso=4,mosi=3,cs=1,rst=0) if isMicroPy() else None
+        if reader is not None:
+            reader.init()
+    def read(self):
+        super().read()
+        uid = critical(self._read)
+        sleep(.02)
+        return uid2Str(uid) if uid else None
+        # return reader.tohexstring(uid)
+    def _read(self):
+        s = self.state; l = s.last
+        lastUID = l[0]; reader = self.reader
+        stat = tag_type = None
+        (stat, tag_type) = reader.request(reader.REQIDL)
+        if stat != reader.OK:
+            self.reset()
+            return None
+        (stat, uid) = reader.SelectTagSN()
+        # uid = int.from_bytes(bytes(uid), 'little') if uid else 0
+        uid = uid[0] | (uid[1] << 8) | (uid[2] << 16) | (uid[3] << 24) if uid else 0
+        # last: [card, ts]
+        if uid == lastUID:
+            return None
+        if stat != reader.OK:
+            self.reset()
+            return None        
+        # print('debug6')
+        if (isLocalPy()):
+            print('Card detected: ', uid2Str(uid))                              # DEBUG
+        if reader.IsNTAG():
+            if (isLocalPy()):
+                print(f'Got NTAG: ', reader.NTAG)                               # DEBUG
+                reader.MFRC522_Dump_NTAG(Start=0, End=reader.NTAG_MaxPage)      # DEBUG
+            #print("Write Page 5  to 0x1,0x2,0x3,0x4  in 2 second")
+            #utime.sleep(2)
+            #data = [1,2,3,4]
+            #reader.writeNTAGPage(5,data)
+            #reader.MFRC522_Dump_NTAG(Start=5,End=6)
+        else:
+            (stat, tag_type) = reader.request(reader.REQIDL)
+            if stat != reader.OK:
+                self.reset()
+                return None
+            (stat, uid2) = reader.SelectTagSN()
+            if not (stat == reader.OK and uid == uid2):
+                return None
+            # defaultKey = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+            if isLocalPy():
+                reader.MFRC522_DumpClassic1K(uid, Start=0, End=64, keyA=self._defaultKey)
+        l[0] = uid
+        return uid
 
 class Buzzer(BaseBuzzer):
     def __init__(self):
         super().__init__()
         c = hw.buzzer
-        self.buzzer = PWM(Pin(c.pin))
+        self.buzzer = PWM(Pin(c.pin)) if 'PWM' in globals() else None
 
 # ---------- Device Initialization ----------
 shared.updateCheck = True

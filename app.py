@@ -6,13 +6,15 @@ from app_infoPart import *
 from app_menus import *
 
 async def init():
-    global aborted, localIP, srvIP, srvPort, dev, wifi, ws, lcd, led, keypad, buzzer, h
+    global aborted, localIP, srvIP, srvPort, dev, wifi, ws
+    global lcd, led, keypad, rfid, buzzer, h
     localIP = ip2Str(local.ip); srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
     print(f'localIP: [{localIP}] | server rawwset: [{srvIP}:{srvPort}]')
     aborted = False
     dev = initDevice(); h = initHandlers()
     wifi = dev.wifi; lcd = dev.lcd; led = dev.led;
-    ws = dev.ws; keypad = dev.keypad; buzzer = dev.buzzer
+    ws = dev.ws; keypad = dev.keypad;
+    rfid = dev.rfid; buzzer = dev.buzzer
     shared._onKeyPressed = onKeyPressed
     shared._onKeyReleased = onKeyReleased
     
@@ -41,9 +43,17 @@ async def run():
 
 def threadProc():
     global aborted
-    scan_interval_secs = (hw.keypad.scan_interval_ms or 10) / 1000
+    keypad_wait_secs = (hw.keypad.scan_interval_ms or 10) / 1000
+    rfid_wait_secs = (hw.rfid.scan_interval_ms or 10) / 1000
     while not aborted:
+        katsayi = 20 if isIdle() else 1
         try:
+            if keypad_wait_secs:
+                sleep(rfid_wait_secs * katsayi)
+            if rfid is not None:
+                rfid.update()
+            if keypad_wait_secs:
+                sleep(keypad_wait_secs * katsayi)
             if keypad is not None:
                 keypad.update()
         except KeyboardInterrupt as ex:
@@ -53,7 +63,6 @@ def threadProc():
         except Exception as ex:
             print('[ERROR]', ex)
             print_exception(ex)
-        sleep(scan_interval_secs * 20 if isIdle() else scan_interval_secs)
 
 async def loop():
     await asleep(1 if isIdle() else .01)
@@ -136,7 +145,7 @@ async def updateMainScreen():
     # if True: return False
     if lcdIsBusy(): return False
     lastTime = shared.lastTime
-    if lastTime.updateMainScreen and monotonic() - lastTime.updateMainScreen <= 0.5: return False
+    if lastTime.updateMainScreen and monotonic() - lastTime.updateMainScreen <= 1: return False
     renderAppTitle()
     # if lcdCanBeCleared(): lcd.clearLineIfReady(range(1, lcd.getRows() - 1))
     rec = shared.curStatus
@@ -166,12 +175,12 @@ async def updateMainScreen():
         print(f'status_check prev hash:  [{shared._updateMainScreen_lastHashStr}]')
         shared._updateMainScreen_lastHashStr = hashStr
         shared._updateMainScreen_lastDebugText = text
-        lastTime.updateMainScreen = monotonic()
         #  {"isNetMiktar": 15.0, "operNo": 8, "isFireMiktar": 0.0, "siradakiIsSayi": 0, "emirNox": "1688", "sonDurTS": "26.08.2025 17:35:28", "duraksamaKritik": false, "hatID": "030", "aktifCevrimSayisi": 0, "atananIsSayi": 1, "sonIslemTS": "26.08.2025 17:30:27", "sabitDuraksamami": 0, "operAciklama": "CNC DİK TORNA", "emirMiktar": 2.0, "operatorCagrimTS": null, "ip": "192.168.2.50", "onceUretMiktar": 15.0, "durumKod": "DR", "isSaymaSayisi": 1, "oemID": 9762, "urunAciklama": "9-11 KAMPANA İŞLEME", "urunKod": "KAMP01-9-11-6B", "perKod": "AR-GE01", "isSaymaInd": 0, "durNedenKod": "06", "sinyalKritik": true, "emirTarih": "25.06.2025 00:00:00", "sonAyrilmaDk": 5.22611, "perIsim": "ENES VURAL", "oemgerceklesen": 35.0, "onceCevrimSayisi": 15, "isID": 3, "aciklama": "CNC1", "ekBilgi": "", "seq": 1, "oemistenen": 2.0, "id": "CNC01", "durNedenAdi": "AYRILMA", "aktifUretMiktar": 0.0, "isIskMiktar": 0.0, "hatAciklama": "TALASLI IMALAT", "basZamanTS": "26.08.2025 17:30:14", "maxAyrilmaDk": 5.22611}
         lcd.writeLineIfReady(f"{urunKod}", 0, 0)
         lcd.writeLineIfReady(f"{perKod}", 1, 0)
         lcd.writeLineIfReady(f"U:{onceUretMiktar}+{aktifUretMiktar} | S:{isSaymaInd}/{isSaymaSayisi}", 2, 0)
         lcd.writeLineIfReady(f"D:{durumKod} | E:{emirMiktar}", 3, 0)
+        lastTime.updateMainScreen = monotonic()
     return True
 def renderAppTitle():
     # from config import app

@@ -16,7 +16,7 @@ class RingBuffer:
     # ------------------------------------------------------
     def push(self, item):
         """Yeni öğe ekle (True=eklendi, False=overflow)."""
-        with self.lock:
+        def doit():
             nxt = (self.head + 1) % self.size
             if nxt == self.tail:
                 # Overflow -> eskiyi ezmek istersen self.tail = (self.tail + 1) % self.size
@@ -24,51 +24,66 @@ class RingBuffer:
             self.buf[self.head] = item
             self.head = nxt
             return True
+        return self.withLockDo(doit)
     # ------------------------------------------------------
     def pop(self):
         """İlk öğeyi al (None=boş)."""
-        with self.lock:
+        def doit():
             if self.tail == self.head:
                 return None
             item = self.buf[self.tail]
             self.buf[self.tail] = None
             self.tail = (self.tail + 1) % self.size
             return item
+        return self.withLockDo(doit)
     # ------------------------------------------------------
     def peek(self):
         """İlk öğeyi silmeden oku."""
-        with self.lock:
+        def doit():
             if self.tail == self.head:
                 return None
             return self.buf[self.tail]
+        return self.withLockDo(doit)
     # ------------------------------------------------------
     def clear(self):
         """Buffer'ı temizle."""
-        with self.lock:
+        def doit():
             self.head = self.tail = 0
             for i in range(self.size):
                 self.buf[i] = None
+        return self.withLockDo(doit)
+    def withLockDo(self, proc, *args, **kwargs):
+        from common import shared
+        if not proc:
+            return None
+        if shared._inCritical:
+            return proc(*args, **kwargs)
+        with self.lock:
+            return proc(*args, **kwargs)
 
     # ------------------------------------------------------
     @property
     def count(self):
         """Buffer'daki öğe sayısı."""
-        with self.lock:
+        def doit():
             if self.head >= self.tail:
                 return self.head - self.tail
             return self.size - (self.tail - self.head)
+        return self.withLockDo(doit)
     # ------------------------------------------------------
     @property
     def full(self):
         """Buffer dolu mu?"""
-        with self.lock:
+        def doit():
             return (self.head + 1) % self.size == self.tail
+        return self.withLockDo(doit)
     # ------------------------------------------------------
     @property
     def empty(self):
         """Buffer boş mu?"""
-        with self.lock:
+        def doit():
             return self.head == self.tail
+        return self.withLockDo(doit)
     # ------------------------------------------------------
     def __len__(self):
         return self.count
@@ -79,11 +94,14 @@ class RingBuffer:
     def __iter__(self):
         """Thread-safe, heap-free iterator (FIFO sırası)."""
         # Mevcut head/tail snapshot alınır, böylece push/pop sırasında çakışma olmaz
-        with self.lock:
-            head = self.head
-            tail = self.tail
-            size = self.size
-            buf = self.buf
+        from common import shared
+        if shared._inCritical:
+            with self.lock:
+                head = self.head; tail = self.tail
+                size = self.size; buf = self.buf
+        else:
+            head = self.head; tail = self.tail
+            size = self.size; buf = self.buf
         # snapshot sonrası sadece okunur erişim
         while tail != head:
             yield buf[tail]

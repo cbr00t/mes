@@ -4,6 +4,7 @@ async def main():
     import app
     await app.init()
     await app.run()
+    # print(uid2Str([11,22,33,44]))
     # await test3()
 
 

@@ -2,19 +2,6 @@
 from common import *
 from config import hw
 
-if not 'Pin' in globals():
-    class Pin:
-        IN = 0; OUT = 1
-        PULL_UP = 0; PULL_DOWN = 1
-        def __init__(self, num, in_out, value = IN):
-            self.num = num
-            self.in_out = in_out
-            self._value = value
-        @property
-        def value(val=None):
-            if val is None: return val
-            self._value = val
-
 class BaseKeypad:
     def __init__(self):
         c = hw.keypad

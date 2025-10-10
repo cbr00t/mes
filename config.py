@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 6)
+    version                         = (1, 1, 7)
 )
 
 
@@ -31,7 +31,7 @@ server = NS(
     rawPort                         =  8199,
     updatePorts                     =  [80, 2085],
     wsPath                          =  'ws/skyMES/makineDurum',
-    autoUpdate                      =  None,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
+    autoUpdate                      =  True,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
     hearbeatInterval                =  0,                                  # in secs. ( <= 0 Or None ) = no heartbeat
     statusCheckInterval             =  2,                                  # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
@@ -70,7 +70,11 @@ hw = NS(
         ],
         debounce_ms = 10,
         scan_interval_ms = 50,
-        simulation_interval_ms = 1500
+        simulation_interval_ms = 2_000
+    ),
+    rfid = NS(
+        scan_interval_ms = 50,
+        simulation_interval_ms = 5_000
     ),
     lcd = NS(
         rows = int(4), cols = int(20),
