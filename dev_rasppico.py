@@ -2,9 +2,7 @@
 from common import *
 from config import local, server as srv, hw
 from devBase import *
-import socket
 if isMicroPy():
-    import urequests
     from machine import Pin, I2C, PWM
     from network import WLAN, STA_IF
     import rp2
@@ -31,8 +29,11 @@ if isMicroPy():
 class WiFi(BaseWiFi):
     def __init__(self):
         super().__init__()
+        sleep(.5)
         wlan = self.wlan = WLAN(STA_IF) if 'WLAN' in globals() else None
         if wlan:
+            try: wlan.active(False)
+            except: pass
             wlan.active(True)
         try:
             import rp2
@@ -43,19 +44,6 @@ class WiFi(BaseWiFi):
         super().isConnected()
         wlan = self.wlan
         return wlan.isconnected()
-
-# ---------- Web Requests Class ----------
-class WebReq(BaseWebReq):
-    def send(self, url, timeout=5):
-        super().send(url, timeout)
-        print(f"HTTP GET: {url}")
-        try:
-            result = urequests.get(url, timeout=timeout)
-            print(f"→ status: {result.status_code}")
-            return result
-        except Exception as ex:
-            print("HTTP error:", ex)
-            return None
 
 # ---------- Raw TCP Socket Class ----------
 class RawSocket(BaseRawSocket):
@@ -106,48 +94,61 @@ class Keypad(BaseKeypad):
         super().scanKeyState()
         return critical(self._scanKeyState)
     def _scanKeyState(self):
-        """ (released, key) or None """
-        super()._scanKeyState()
+        """Tuş basım/bırakma olaylarını döndürür. 
+           Dönüş: [key, t_last, t_diff, released] veya None
+        """
         LO = 0; HI = 1
-        s = self.state; l = s.last
+        s = self.state
+        l = s.last  # [key, t_last, t_diff, released]
         pinRows, pinCols = s.pin
-        rngRows, rngCols = s.rng
         debounce_ms = s.debounce_ms
         lbl = s.labels
-        r = 0; c = None
-        for rPin in pinRows:
-            rPin.value(LO)                    # activate row
-            sleep_us(5)                       # kısa stabilizasyon
-            c = 0
-            for cPin in pinCols:
-                pressed = cPin.value() == LO
+
+        _now = ticks_ms()
+        active_key = None
+
+        for r, rPin in enumerate(pinRows):
+            rPin.value(LO)
+            sleep_us(5)
+
+            for c, cPin in enumerate(pinCols):
+                if lbl[r][c] is None:
+                    continue
+
+                pressed = (cPin.value() == LO)
+                key_label = lbl[r][c]
+
+                # ----- TUŞ BASILDI -----
                 if pressed:
-                    key, _time = l
-                    _now = ticks_ms()
-                    ok = not(key and _time)   # (key VE zaman hiç yoksa)
-                                              # debounce_ms kullanılır ise de ==> (zaman farkı > debounce_ms) ise (tuş titreşim kontrolü)
-                    ok = ok and (not debounce_ms or ticks_diff(_now, _time) > debounce_ms)
-                    if ok:
-                        # last = [key, time, tsDiff, released]
-                        l[0] = lbl[r][c]
-                        l[1] = _now
-                        l[2] = None
-                        l[3] = False
-                    return l
-                elif l[0] == lbl[r][c]:
-                    _now = ticks_ms(); _time = l[1]
-                    _tsDiff = ticks_diff(_now, _time)
-                    if _tsDiff > (debounce_ms or 0):
-                        # l[0] = lbl[r][c]
-                        l[1] = _now
-                        l[2] = _tsDiff
-                        l[3] = True
+                    if l[0] != key_label:
+                        # Yeni tuş basılmış
+                        if not l[0] or ticks_diff(_now, l[1]) > debounce_ms:
+                            l[0] = key_label
+                            l[1] = _now
+                            l[2] = 0
+                            l[3] = False
+                            rPin.value(HI)
+                            return l
                     else:
-                        l[0] = l[1] = l[2] = l[3] = None
-                c += 1
-            rPin.value(HI)                    # deactivate row
-            r += 1
+                        # Aynı tuşa basılı tutma durumu
+                        # debounce süresi dolduysa "basılı kalıyor" kabul et ama event üretme
+                        pass
+
+                # ----- TUŞ BIRAKILDI -----
+                else:
+                    if l[0] == key_label and not l[3]:
+                        if ticks_diff(_now, l[1]) > debounce_ms:
+                            l[2] = ticks_diff(_now, l[1])
+                            l[1] = _now
+                            l[3] = True
+                            rPin.value(HI)
+                            return l
+                        # henüz debounce dolmadıysa bekle
+            rPin.value(HI)
+
+        # Hiçbir tuşa basılmamışsa veya olay yoksa None
         return None
+
     def abort(self):
         self._aborted = True
         return self
@@ -237,6 +238,7 @@ class LED(BaseLED):
         strip = self.strip
         strip.fill(color)
         strip.show()
+        sleep(.001)
         return self
     def clear(self):
         super().clear()
@@ -269,7 +271,7 @@ class RFID(BaseRFID):
             self.reset()
             return None
         (stat, uid) = reader.SelectTagSN()
-        # uid = int.from_bytes(bytes(uid), 'little') if uid else 0
+        # uid = int.from_bytes(bytes(uid), byteorder) if uid else 0
         uid = uid[0] | (uid[1] << 8) | (uid[2] << 16) | (uid[3] << 24) if uid else 0
         # last: [card, ts]
         if uid == lastUID:
@@ -314,7 +316,7 @@ shared.updateCheck = True
 dev = shared.dev = Device()
 
 def setup_wifi():   dev.wifi   = WiFi()
-def setup_req():    dev.req    = WebReq()
+# def setup_req():    dev.req    = WebReq()
 # def setup_sock():   dev.sock   = RawSocket()
 def setup_ws():     dev.ws     = WebSocket()
 def setup_keypad(): dev.keypad = Keypad()
@@ -324,7 +326,7 @@ def setup_rfid():   dev.rfid   = RFID()
 def setup_buzzer(): dev.buzzer = Buzzer()
 
 for step in [
-    setup_wifi, setup_req, setup_ws, setup_keypad,
+    setup_wifi, setup_ws, setup_keypad,
     setup_lcd, setup_led, setup_rfid, setup_buzzer
 ]:
     step()

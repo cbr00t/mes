@@ -149,7 +149,7 @@ class RFID(BaseRFID):
     def read(self):
         super().read()
         s = self.state; l = s.last
-        uid = int.from_bytes(bytes([0x0C, 0x0B, 0x03, 0x00]), 'little')
+        uid = int.from_bytes(bytes([0x0C, 0x0B, 0x03, 0x00]), byteorder)
         # rfid, ts
         l[0] = uid
         l[1] = ticks_ms()

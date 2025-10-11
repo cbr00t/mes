@@ -127,9 +127,9 @@ class Part(NS):
             _clear = True
         if _clear:
             from app import updateMainScreen
-            out = Part.stdout(); out.clear();
+            out = Part.stdout(); out.clear()
             shared._appTitleRendered = shared._inActionsCheck = False
-            shared.lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = None
+            shared.lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = shared._updateMainScreen_lastHashStr = None
             updateMainScreen()
         print('part stack len:', len(Part.stack()))
     def canClose(self):

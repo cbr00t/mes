@@ -21,16 +21,19 @@ async def init():
 async def run():
     global aborted
     lcd.off().on(); lcd.clearIfReady()
-    led.write('SIYAH'); led.clear()
-    for i in range(0, 2):
-        await buzzer.beep(4000, .1)
-    await buzzer.beep(4000, .3)
-    print('app started')
-    # if keypad is not None:
-    #    keypad.set_onPressed(shared._onKeyPressed)
-    #    keypad.set_onReleased(shared._onKeyReleased)
-    # async_task(threadProc)
+    
     thread(threadProc)
+    
+    led.write('SIYAH')
+    for i in range(0, 2):
+        led.clear()
+        buzzer.beep(4000, .08)
+        led.write('MOR')
+        await asleep(.001);
+    buzzer.beep(4000, .3)
+    sleep(.02); led.clear()
+    print('app started')
+    
     while not aborted:
         try:
             await loop()
@@ -69,10 +72,12 @@ async def loop():
     if not (await wifiCheck() and await connectToServerIfNot()): return
     if not shared._updateCheckPerformed: await updateFiles()
     lastTime = shared.lastTime
+    # rfid.update(); keypad.update()
     await processQueues()
     if not lcdIsBusy():
         await wsCheckStatusIfNeed()
         await updateMainScreen()
+        # rfid.update(); keypad.update()
 
 def initDevice():
     print('    init device')
@@ -143,9 +148,11 @@ async def connectToServerIfNot():
 
 async def updateMainScreen():
     # if True: return False
-    if lcdIsBusy(): return False
+    if lcdIsBusy():
+        return False
     lastTime = shared.lastTime
-    if lastTime.updateMainScreen and monotonic() - lastTime.updateMainScreen <= 1: return False
+    if lastTime.updateMainScreen and monotonic() - lastTime.updateMainScreen < .5:
+        return False
     renderAppTitle()
     # if lcdCanBeCleared(): lcd.clearLineIfReady(range(1, lcd.getRows() - 1))
     rec = shared.curStatus
@@ -169,18 +176,22 @@ async def updateMainScreen():
     hashStr = (
         f"{urunKod}|{perKod}|{onceUretMiktar}|{aktifUretMiktar}",
         f"{isSaymaInd}|{isSaymaSayisi}|{durumKod}|{emirMiktar}"
-    )
+    ) if lastTime else None
     if hashStr != shared._updateMainScreen_lastHashStr:
         print(f'status_check cur  hash:  [{hashStr}]')
         print(f'status_check prev hash:  [{shared._updateMainScreen_lastHashStr}]')
         shared._updateMainScreen_lastHashStr = hashStr
         shared._updateMainScreen_lastDebugText = text
         #  {"isNetMiktar": 15.0, "operNo": 8, "isFireMiktar": 0.0, "siradakiIsSayi": 0, "emirNox": "1688", "sonDurTS": "26.08.2025 17:35:28", "duraksamaKritik": false, "hatID": "030", "aktifCevrimSayisi": 0, "atananIsSayi": 1, "sonIslemTS": "26.08.2025 17:30:27", "sabitDuraksamami": 0, "operAciklama": "CNC DİK TORNA", "emirMiktar": 2.0, "operatorCagrimTS": null, "ip": "192.168.2.50", "onceUretMiktar": 15.0, "durumKod": "DR", "isSaymaSayisi": 1, "oemID": 9762, "urunAciklama": "9-11 KAMPANA İŞLEME", "urunKod": "KAMP01-9-11-6B", "perKod": "AR-GE01", "isSaymaInd": 0, "durNedenKod": "06", "sinyalKritik": true, "emirTarih": "25.06.2025 00:00:00", "sonAyrilmaDk": 5.22611, "perIsim": "ENES VURAL", "oemgerceklesen": 35.0, "onceCevrimSayisi": 15, "isID": 3, "aciklama": "CNC1", "ekBilgi": "", "seq": 1, "oemistenen": 2.0, "id": "CNC01", "durNedenAdi": "AYRILMA", "aktifUretMiktar": 0.0, "isIskMiktar": 0.0, "hatAciklama": "TALASLI IMALAT", "basZamanTS": "26.08.2025 17:30:14", "maxAyrilmaDk": 5.22611}
-        lcd.writeLineIfReady(f"{urunKod}", 0, 0)
-        lcd.writeLineIfReady(f"{perKod}", 1, 0)
+        if not (lastTime and shared._updateMainScreen_lastUrunKod != urunKod):
+            lcd.writeLineIfReady(f"{urunKod}", 0, 0)
+        if not (lastTime and shared._updateMainScreen_lastPerKod != perKod):
+            lcd.writeLineIfReady(f"{perKod}", 1, 0)
         lcd.writeLineIfReady(f"U:{onceUretMiktar}+{aktifUretMiktar} | S:{isSaymaInd}/{isSaymaSayisi}", 2, 0)
         lcd.writeLineIfReady(f"D:{durumKod} | E:{emirMiktar}", 3, 0)
         lastTime.updateMainScreen = monotonic()
+        shared._updateMainScreen_lastUrunKod = urunKod
+        shared._updateMainScreen_lastPerKod = perKod
     return True
 def renderAppTitle():
     # from config import app
@@ -287,9 +298,11 @@ async def processQueues():
     if not queue:
         return
     recs = []; count = 0
+    lock = allocate_lock()
     while queue:
         # key, rfid, duration, ts, tsDiff, released
-        rec = queue.pop()
+        with lock:
+            rec = queue.pop()
         key, rfid, duration, ts, _, released = rec
         if not (key and ts):
             continue
@@ -298,18 +311,19 @@ async def processQueues():
         count += 1
     if not count:
         return
-    print(f'[DEBUG]  {count} keys ready to process')
+    print('[DEBUG]  ', f'{count} keys ready to process')
+    async def _clear():
+        await asleep(.5)
+        lcd.writeIfReady('        ', lcd.getRows() - 1, lcd.getCols() - 8)
     for rec in recs:
         # key, rfid, duration, ts, tsDiff, released
-        _, _, _, _, _,released = rec
-        func = getattr(shared, '_onKeyReleased' if released else '_onKeyPressed')
-        async def _clear():
-            await asleep(.5)
-            lcd.writeIfReady('        ', lcd.getRows() - 1, lcd.getCols() - 8)
+        key, rfid, _, _, _,released = rec
+        func = shared._onKeyReleased if released else shared._onKeyPressed
+        print('[DEBUG]  ', 'released' if released else 'pressed', f'key: [{key}] | rfid: [{rfid}] | handler: [{func}]')
         async_task(_clear)
         try:
             result = func(rec)
-            if hasattr(result, '__await__'):
+            if iscoroutine(result):
                 result = await result
         except Exception as ex:
             print_exception(ex)
@@ -344,12 +358,14 @@ async def updateDurumLED(durumKod):
     if renk:
         led.write(renk)
 async def onKeyPressed(rec):
-    key,_,_,_,_,_ = rec
+    key = rec[0]
     part = activePart()
-    return part.onKeyReleased(key, None) if part else await onKeyPressed_defaultAction(rec)
+    if part:
+        return part.onKeyReleased(key, None)
+    return await onKeyPressed_defaultAction(rec)
     # return part.onKeyPressed(key) if part else await onKeyPressed_defaultAction(key)
 async def onKeyReleased(rec):
-    await onKeyReleased_defaultAction(rec)
+    return await onKeyReleased_defaultAction(rec)
     # part = activePart()
     # return part.onKeyReleased(key, duration) if part else await onKeyReleased_defaultAction(key, duration)
 
@@ -358,8 +374,8 @@ async def onKeyPressed_defaultAction(rec):
     print(f'{key} press')
     key = key.lower(); lastTime = shared.lastTime._keyPress
     shared.lastTime._keyPress = monotonic()
-    if lastTime and ticks_diff(ticks_ms(), lastTime) < 100:
-        return False
+    # if lastTime and ticks_diff(ticks_ms(), lastTime) < 100:
+    #     return False
     # delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
     lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
     shared.lastTime._keySend = monotonic()
@@ -380,7 +396,7 @@ async def onKeyPressed_defaultAction(rec):
             args = { 'id': _id, 'duration': None, 'ts': ts, 'tsDiff': tsDiff, 'released': False }
             if not await ws.wsTalk('fnIslemi', args=args):
                 raise RuntimeError()
-            await buzzer.beep(3000, .2)
+            buzzer.beep(3000, .2)
             # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
         except Exception as ex:
             # lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
@@ -392,7 +408,7 @@ async def onKeyPressed_defaultAction(rec):
                 _id, rfid, duration, ticks_ms(), None, False
             )
             keyQueue_push(item)
-            await buzzer.beep(500, 1)
+            buzzer.beep(500, 1)
         finally:
             await wsCheckStatusIfNeed()
     return True

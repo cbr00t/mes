@@ -11,7 +11,7 @@ class BaseRFID:
             last = [0, None]
         )
         self._defaultKey = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-        # self._defaultKey = int.from_bytes(bytes([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), 'little')
+        # self._defaultKey = int.from_bytes(bytes([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), byteorder)
     def reset(self):
         self.state.last[0] = 0
         return self

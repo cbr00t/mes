@@ -4,12 +4,13 @@ import gc
 import sys
 import time
 from time import sleep
-from sys import implementation as impl
+from sys import implementation as impl, byteorder
+from _thread import start_new_thread, allocate_lock
 
 if impl.name == 'cpython':    # CPython = (local)
     import threading, traceback, asyncio
     from time import monotonic
-    from asyncio import new_event_loop, set_event_loop
+    from asyncio import new_event_loop, set_event_loop, iscoroutinefunction, iscoroutine
     import tracemalloc
     tracemalloc.start()
     def print_exception(e):
@@ -45,8 +46,17 @@ elif impl.name == 'micropython':
     from time import ticks_diff, ticks_ms, sleep_ms, sleep_us
     from sys import print_exception
     from machine import disable_irq, enable_irq
+    
+    _gen_type = type((lambda: (yield))())
+    
     def monotonic():
         return ticks_ms() / 1000
+    def iscoroutinefunction(func):
+        # async def fonksiyonlarda co_flags 0x80 bit'i set edilir
+        return hasattr(func, '__code__') and bool(func.__code__.co_flags & 0x80)
+    def iscoroutine(result):
+        return hasattr(result, '__await__') or isinstance(result, _gen_type)
+
 
 # Global Vars
 if not 'encoding' in globals():
@@ -156,7 +166,7 @@ def uid2Str(value):
     if isinstance(value, list):
         value = bytes(value)
     if isinstance(value, bytes):
-        value = int.from_bytes(value, 'little')
+        value = int.from_bytes(value, byteorder)
     return f'{value:08X}'
     return f'{value:X}'
 def join(delim, *values):
@@ -181,23 +191,26 @@ def safeImport(name, as_ = None):
         print(f"[ModuleError] {name} import failed:", ex)
         return None
 def critical(proc, *args, **kwargs):
+    if not callable(proc):
+        raise TypeError(f"critical(): invalid callback {proc}")
     if shared._inCritical:
         return proc(*args, **kwargs)
-    shared._inCritical = True
     state = cli()
     try:
         return proc(*args, **kwargs)
     finally:
         sti(state)
-        shared._inCritical = False
 def cli():
-    state = disable_irq()
+    # state = disable_irq()
+    state = False
     gc.disable()
+    shared._inCritical = True
     return state
 def sti(irq_state = None):
-    enable_irq(irq_state)
+    # enable_irq(irq_state)
     gc.collect()
     gc.enable()
+    shared._inCritical = False
 def isWindows():
     import os
     return os.name == 'nt'       # Windows
@@ -271,9 +284,8 @@ def async_task(proc, *args, **kwargs):
 def thread(proc, *args, **kwargs):
     """Runs new thread in core1"""
     try:
-        import _thread
         try:
-            return _thread.start_new_thread(proc, args or (), kwargs)
+            return start_new_thread(proc, args or (), kwargs)
         except Exception as ex2:
             print("thread hatası:", ex2)
             raise
@@ -383,7 +395,9 @@ def statusShouldBeChecked():
 
 
 
-if not 'Pin' in globals():
+try:
+    from machine import Pin 
+except:
     class Pin:
         IN = 0; OUT = 1
         PULL_UP = 0; PULL_DOWN = 1
@@ -392,6 +406,6 @@ if not 'Pin' in globals():
             self.in_out = in_out
             self._value = value
         @property
-        def value(val=None):
+        def value(self, val=None):
             if val is None: return val
             self._value = val

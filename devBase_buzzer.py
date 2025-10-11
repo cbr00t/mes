@@ -6,7 +6,7 @@ from config import hw
 class BaseBuzzer:
     def __init__(self):
         self.buzzer = None
-    async def beep(self, freq=None, duration=None, pause=None):
+    def beep(self, freq=None, duration=None, pause=None):
         buzz = self.buzzer
         if buzz is None:
             return self
@@ -16,8 +16,8 @@ class BaseBuzzer:
         if pause is None: pause = c.pause
         buzz.freq(freq)           # frekans Hz
         buzz.duty_u16(32768)      # %50 duty cycle
-        await asleep(duration)    # calarken bekle
+        sleep(duration)    # calarken bekle
         buzz.duty_u16(0)          # kapat
         if pause:
-            await asleep(pause)   # bekle
+            sleep(pause)   # bekle
         return self

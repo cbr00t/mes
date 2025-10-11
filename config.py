@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 7)
+    version                         = (1, 1, 9)
 )
 
 
@@ -33,9 +33,8 @@ server = NS(
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  True,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
-    hearbeatInterval                =  0,                                  # in secs. ( <= 0 Or None ) = no heartbeat
-    statusCheckInterval             =  2,                                  # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
-    socketTimeout                   =  0.5                                 # in secs. default value
+    statusCheckInterval             =  1.0,                                # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
+    socketTimeout                   =  0.05                                # in secs. default value
 )
 
 wifi = NS(
@@ -68,12 +67,12 @@ hw = NS(
             ['f3', '7', '8', '9', 'down'],
             ['f4', 'esc', '0', 'enter', None]
         ],
-        debounce_ms = 10,
-        scan_interval_ms = 50,
+        debounce_ms = 5,
+        scan_interval_ms = 20,
         simulation_interval_ms = 2_000
     ),
     rfid = NS(
-        scan_interval_ms = 50,
+        scan_interval_ms = 20,
         simulation_interval_ms = 5_000
     ),
     lcd = NS(
@@ -82,7 +81,7 @@ hw = NS(
         freq = 400_000, addr = 0x27
     ),
     led = NS(count = 1, pin = 22, brightness = 200),
-    buzzer = NS(pin = 21, freq = 440, duration = 0.2, pause = 0.05)
+    buzzer = NS(pin = 21, freq = 440, duration = 0.15, pause = 0.1)
 )
 
 from config_override import *

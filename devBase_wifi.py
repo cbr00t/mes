@@ -10,8 +10,11 @@ class BaseWiFi:
         return True
     def connect(self, ssid = None, passwd = None, timeout = None):
         wlan = self.wlan
-        if not wlan: self.init(); wlan = self.wlan
-        if not wlan: return False
+        if not wlan:
+            self.init()
+            wlan = self.wlan
+        if not wlan:
+            return False
         print(f'wifi connected = {wlan.isconnected()}')
         if not wlan.isconnected():
             if ssid is None: ssid = wifi.ssid

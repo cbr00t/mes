@@ -26,24 +26,33 @@ class BaseKeypad:
             # row, col   (ranges)
             range(s.ln[0]), range(s.ln[1])
         )
-        pass
     def update(self):
         s = self.state
         try:
             l = self.scanKeyState()
-            key = l[0]; _ts = l[1]
-            _tsDiff = l[2]; released = l[3]
+            if l is None:
+                return False
+            
+            key, _ts, _tsDiff, released = l
             if not (key and _ts):
                 return False
-            rec = (
-                # key, rfid, duration, ts, tsDiff, released
-                key, None, None, _ts, _tsDiff, released
-            )
+            
+            # key, rfid, duration, ts, tsDiff, released
+            rec = (key, None, None, _ts, _tsDiff, released)
             shared.queues.key.push(rec)
+
+            # reset sadece press eventlerinde
+            if not released:
+                # key, ts, lastTS, released
+                # lock = allocate_lock()
+                # with lock:
+                l[0] = l[1] = l[2] = None
+                l[3] = False
             return True
         except Exception as ex:
             print("Keypad tarama hatası:", ex)
             print_exception(ex)
-        return self
+            return False
+
     def scanKeyState(self):
         return None
