@@ -21,7 +21,7 @@ local = NS(
     gateway                         =  None,
     subnet                          =  (255, 255, 255, 0),
     dns                             =  (1, 1, 1, 1),
-    idleTime                        =  30 * 60_000,                       # ms
+    idleTime                        =  30 * 60,                           # sn
     threadLoop_globalWait_ms        =  10
 )
 
@@ -78,7 +78,7 @@ hw = NS(
     ),
     lcd = NS(
         rows = int(4), cols = int(20),
-        rc_status = (1, -2),
+        rc_status = (1, -2), clearDelay = 500,
         _id = 1, scl = 27, sda = 26,
         freq = 400_000, addr = 0x27
     ),

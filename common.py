@@ -208,7 +208,7 @@ def cli():
     return state
 def sti(irq_state = None):
     # enable_irq(irq_state)
-    gc.collect()
+    # gc.collect()
     gc.enable()
     shared._inCritical = False
 def isWindows():
@@ -355,45 +355,36 @@ def activePart():
     return shared.activePart() if shared.activePart is not None else None
 def isIdle():
     from config import local
-    idleTime = local.idleTime
-    if (idleTime or 0) <= 0:
+    idleTime = (local.idleTime or 0) * 1_000    # sn -> ms
+    if idleTime <= 0:
         return False
     return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) > idleTime
 def isBusy():
-    return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) <= 0.3
+    return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) <= 300
 def busy():
     shared.lastTime.busy = ticks_ms()
 def lcdIsBusy():
     return activePart() is not None
 def lcdCanBeCleared():
     from config import hw
-    clearDelay = hw.lcd.clearDelay
-    isBusy = lcdIsBusy(); lastTime = shared.dev.lcd._lastWriteTime
+    isBusy = lcdIsBusy()
+    clearDelay = hw.lcd.clearDelay               # ms
+    lastTime = shared.dev.lcd._lastWriteTime
     # print('lcd_lastWriteTime =', lastTime)
-    return not isBusy and lastTime and (monotonic() - lastTime) >= clearDelay
-def getHeartbeatInterval():
-    if isBusy(): return None
-    from config import server as srv
-    intv = srv.hearbeatInterval
-    if (intv or 0) <= 0: return None
-    if isIdle(): return intv * 3
-    return intv
-def heartbeatShouldBeChecked():
-    if isBusy(): return False 
-    intv = getHeartbeatInterval(); lastTime = shared.lastTime.heartbeat or 0
-    return intv and monotonic() - lastTime > intv
+    return not isBusy and lastTime and ticks_diff(ticks_ms() - lastTime) >= clearDelay
 def getStatusCheckInterval():
-    if isBusy(): return None
+    if isBusy():
+        return None
     from config import server as srv
-    intv = srv.statusCheckInterval
-    if (intv or 0) <= 0: return None
-    if isIdle(): return intv * 3
-    return intv
+    intv = srv.statusCheckInterval or 0
+    if isIdle():
+        intv *= 10
+    return intv if intv else None
 def statusShouldBeChecked():
     if isBusy(): return False 
-    intv = getStatusCheckInterval(); lastTime = shared.lastTime.statusCheck or 0
-    return intv and monotonic() - lastTime > intv
-
+    intv = getStatusCheckInterval() * 1_000
+    lastMS = shared.lastTime.statusCheck or 0
+    return intv and ticks_diff(ticks_ms(), lastMS) > intv
 
 
 try:

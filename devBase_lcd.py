@@ -28,7 +28,8 @@ class BaseLCD:
     def readString(self):
         return '\n'.join(self.readLines())
     def write(self, data, row=0, col=0, _internal=False):
-        if not _internal: self._lastWriteTime = monotonic()
+        if not _internal:
+            self._lastWriteTime = ticks_ms()
         rowCount = self.getRows(); colCount = self.getCols()
         if row < 0: row = rowCount + row      # !!  (rowCount + (-value)
         if col < 0: col = colCount + col      # !!  (colCount + (-value)
@@ -109,8 +110,10 @@ class BaseLCD:
             self.clearLine(r)
         return self
         # return self.clear()
-    def writeStatus(self, ch):
+    def writeStatus(self, ch, relCol = 0):
         rcs = self._rc_status
+        if relCol:
+            rcs = (rcs[0], rcs[1] - relCol)
         if rcs:
             self.write(ch or ' ', *rcs)
             # self.write(ch or ' ', rcs[0], rcs[1])

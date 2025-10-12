@@ -93,6 +93,7 @@ async def loop():
     if not lcdIsBusy():
         await wsCheckStatusIfNeed()
     await processQueues()
+    lcd.writeStatus('z' if isIdle() else ' ', 1)
     if not lcdIsBusy():
         await updateMainScreen()
         # rfid.update(); keypad.update()
@@ -239,7 +240,7 @@ async def wsCheckStatusIfNeed():
         if rec:
             rec = rec[0] if isinstance(rec, list) else rec
             shared.curStatus = rec
-            shared.lastTime.statusCheck = monotonic()
+            shared.lastTime.statusCheck = ticks_ms()
             ledDurum = rec.get('ledDurum') if isinstance(rec, dict) else None
             durumKod = rec.get('durumKod') if isinstance(rec, dict) else None
             _exec = rec.get('_exec') if isinstance(rec, dict) else None
