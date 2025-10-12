@@ -356,12 +356,13 @@ def activePart():
 def isIdle():
     from config import local
     idleTime = local.idleTime
-    if (idleTime or 0) <= 0: return False
-    return shared.lastTime.busy and monotonic() - shared.lastTime.busy > idleTime
+    if (idleTime or 0) <= 0:
+        return False
+    return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) > idleTime
 def isBusy():
-    return shared.lastTime.busy and monotonic() - shared.lastTime.busy <= 0.3
+    return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) <= 0.3
 def busy():
-    shared.lastTime.busy = monotonic()
+    shared.lastTime.busy = ticks_ms()
 def lcdIsBusy():
     return activePart() is not None
 def lcdCanBeCleared():

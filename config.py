@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 9)
+    version                         = (1, 1, 11)
 )
 
 
@@ -21,7 +21,8 @@ local = NS(
     gateway                         =  None,
     subnet                          =  (255, 255, 255, 0),
     dns                             =  (1, 1, 1, 1),
-    idleTime                        =  500
+    idleTime                        =  30 * 60_000,                       # ms
+    threadLoop_globalWait_ms        =  10
 )
 
 ## Ana Makine (Server) Ayarları
@@ -34,7 +35,7 @@ server = NS(
     autoUpdate                      =  True,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
     statusCheckInterval             =  1.0,                                # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
-    socketTimeout                   =  0.05                                # in secs. default value
+    socketTimeout                   =  0.01                                # in secs. default value
 )
 
 wifi = NS(
@@ -69,14 +70,15 @@ hw = NS(
         ],
         debounce_ms = 5,
         scan_interval_ms = 20,
-        simulation_interval_ms = 2_000
+        simulation_interval_ms = 5_000
     ),
     rfid = NS(
         scan_interval_ms = 20,
-        simulation_interval_ms = 5_000
+        simulation_interval_ms = 25_000
     ),
     lcd = NS(
         rows = int(4), cols = int(20),
+        rc_status = (1, -2),
         _id = 1, scl = 27, sda = 26,
         freq = 400_000, addr = 0x27
     ),
@@ -84,5 +86,12 @@ hw = NS(
     buzzer = NS(pin = 21, freq = 440, duration = 0.15, pause = 0.1)
 )
 
+
+if isLocalPy():
+    local.threadLoop_globalWait_ms *= 10
+
+
 from config_override import *
+
+
 

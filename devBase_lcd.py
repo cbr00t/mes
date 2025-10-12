@@ -4,6 +4,7 @@ from config import hw
 class BaseLCD:
     @classmethod
     def __init__(self):
+        self._rc_status = hw.lcd.rc_status
         self._lastWriteTime = None
         size = self.getRowCols()
         self._buffer = [['' for _ in range(size.cols)] for _ in range(size.rows)]          # lcd matrix data buffer
@@ -28,13 +29,21 @@ class BaseLCD:
         return '\n'.join(self.readLines())
     def write(self, data, row=0, col=0, _internal=False):
         if not _internal: self._lastWriteTime = monotonic()
-        rowCount = self.getRows()
+        rowCount = self.getRows(); colCount = self.getCols()
+        if row < 0: row = rowCount + row      # !!  (rowCount + (-value)
+        if col < 0: col = colCount + col      # !!  (colCount + (-value)
         if not (0 <= row < rowCount):
             return self
         buf = self._buffer
+        self.move(row, col)
         for i, ch in enumerate(data):
-            if col + i < len(buf[row]):
-                buf[row][col + i] = ch
+            if col + i < colCount:
+                old = buf[row][col+i] or ''
+                if ch != old:
+                    buf[row][col+i] = ch
+                    self._writeChar(ch)
+        return self
+    def _writeChar(self, ch, row=None, col=None):
         return self
     def clearLine(self, row):
         if isinstance(row, range):
@@ -100,6 +109,14 @@ class BaseLCD:
             self.clearLine(r)
         return self
         # return self.clear()
+    def writeStatus(self, ch):
+        rcs = self._rc_status
+        if rcs:
+            self.write(ch or ' ', *rcs)
+            # self.write(ch or ' ', rcs[0], rcs[1])
+        return self
+    def clearStatus(self, ch):
+        return self.writeStatus(None)
     def move(self, row=0, col=0):
         return self
     def on(self):

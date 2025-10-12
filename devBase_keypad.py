@@ -28,6 +28,7 @@ class BaseKeypad:
         )
     def update(self):
         s = self.state
+        dev = shared.dev; buzzer = dev.buzzer
         try:
             l = self.scanKeyState()
             if l is None:
@@ -40,7 +41,11 @@ class BaseKeypad:
             # key, rfid, duration, ts, tsDiff, released
             rec = (key, None, None, _ts, _tsDiff, released)
             shared.queues.key.push(rec)
-
+            busy()
+            
+            if buzzer:
+                buzzer.beep(5000, .05)
+            
             # reset sadece press eventlerinde
             if not released:
                 # key, ts, lastTS, released

@@ -88,6 +88,25 @@ class Keypad(BaseKeypad):
     """
     def __init__(self):
         super().__init__()
+        s = self.state
+         # --- TARAMA ÖNCELİK SIRASI ---
+        # Her eleman: (row_index, col_index) veya (row_index, None)
+        # None => o satırın tüm sütunları ters sırada taranır.
+        scanPriority = []
+        rlen, clen = s.ln
+        # 1. Son satır (önce)
+        if rlen >= 1:
+            scanPriority.append((rlen - 1, None))
+        # 2. İlk satır (ikinci)
+        if rlen >= 2:
+            scanPriority.append((0, None))
+        # 3. Aradakiler (sondan başa)
+        if rlen > 2:
+            for r in range(rlen - 2, 0, -1):
+                scanPriority.append((r, None))
+        # Son olarak sütunları hep sağdan sola tara
+        s.scanPriority = tuple(scanPriority)             # core1 heap alloc yapmasın diye tuple
+        s.colPriority  = tuple(range(clen - 1, -1, -1))  # sabit sütun sırası (sağdan sola)
     def update(self):
         super().update()
     def scanKeyState(self):
@@ -101,27 +120,31 @@ class Keypad(BaseKeypad):
         s = self.state
         l = s.last  # [key, t_last, t_diff, released]
         pinRows, pinCols = s.pin
-        debounce_ms = s.debounce_ms
         lbl = s.labels
-
+        debounce_ms = s.debounce_ms
         _now = ticks_ms()
-        active_key = None
 
-        for r, rPin in enumerate(pinRows):
+        # Pre-allocated, core1 heap-safe diziler
+        scanPriority = s.scanPriority
+        colPriority  = s.colPriority
+
+        for r, c_fixed in scanPriority:
+            rPin = pinRows[r]
             rPin.value(LO)
             sleep_us(5)
 
-            for c, cPin in enumerate(pinCols):
-                if lbl[r][c] is None:
+            # Her satır için sütunlar ters sırada taranır
+            for c in colPriority:
+                cPin = pinCols[c]
+                key_label = lbl[r][c]
+                if key_label is None:
                     continue
 
                 pressed = (cPin.value() == LO)
-                key_label = lbl[r][c]
 
                 # ----- TUŞ BASILDI -----
                 if pressed:
                     if l[0] != key_label:
-                        # Yeni tuş basılmış
                         if not l[0] or ticks_diff(_now, l[1]) > debounce_ms:
                             l[0] = key_label
                             l[1] = _now
@@ -130,8 +153,6 @@ class Keypad(BaseKeypad):
                             rPin.value(HI)
                             return l
                     else:
-                        # Aynı tuşa basılı tutma durumu
-                        # debounce süresi dolduysa "basılı kalıyor" kabul et ama event üretme
                         pass
 
                 # ----- TUŞ BIRAKILDI -----
@@ -143,10 +164,10 @@ class Keypad(BaseKeypad):
                             l[3] = True
                             rPin.value(HI)
                             return l
-                        # henüz debounce dolmadıysa bekle
+
             rPin.value(HI)
 
-        # Hiçbir tuşa basılmamışsa veya olay yoksa None
+        # Olay yoksa None
         return None
 
     def abort(self):
@@ -182,16 +203,25 @@ class LCD(BaseLCD):
         super().clear(); lcd = self.lcd
         if lcd:
             lcd.clear()
-        if isLocalPy():
-            print("lcdClear")
+        # if isLocalPy():
+        #     print("lcdClear")
         return self
     def write(self, data, row=0, col=0, _internal=False):
         super().write(data, row, col, _internal)
-        self.move(row, col)
-        self.lcd.putstr(data)
-        if isLocalPy():
-            print("lcdWrite:", data)
+        # lcd = self.lcd
+        # if lcd:
+        #    lcd.move_to(row, col)
+        #    lcd.putstr(data)
+        # if isLocalPy():
+        #    print("lcdWrite:", data)
         return self
+    def _writeChar(self, ch, row=None, col=None):
+        lcd = self.lcd
+        if lcd:
+            if not (row is None or col is None):
+                lcd.move_to(col, row)
+            lcd.putchar(ch)
+        return super._writeChar(ch, row, col)
     def move(self, row=0, col=0):
         super().move(row, col)
         self.lcd.move_to(col, row)

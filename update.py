@@ -16,82 +16,85 @@ async def updateFiles():
     lcd.clearIfReady()
     lcd.writeIfReady('UPDATE CHECK', 1, 1)
     url = None; lastError = None
-    for _url in urls:
-        if not _url:
-            continue
-        try:
-            resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=.05)
-            print(f'<< resp', resp)
-            resp = resp.get('data', dict()).get('string') if isinstance(resp, dict) else None
-            # if resp:
-            #     try: resp = from64(resp.encode(encoding))
-            #     except Exception as ex: print(ex); continue
-            # Update List yok ise: oto-update iptal
-            if not resp or 'not found' in resp.lower():
-                print('[INFO]', "'files.txt' not found, skipping...")
+    try:
+        for _url in urls:
+            if not _url:
                 continue
-            url = _url; lastError = None
-            break
-        except Exception as ex:
-            lastError = ex; print(f'[ERROR]', ex)
-            continue
-    if lastError:
-        print('[ERROR]', lastError); print_exception(lastError)
-    if lastError or not url:
-        return False
-    for name in resp.splitlines():
-        name = name.strip()
-        if not name:
-            continue
-        try:
-            busy(); fileUrl = f'{url}/{name}'
-            if not lcdIsBusy():
-                lcd.write('UPDATING:      ', 1, 1)
-                lcd.writeLine(name, 2, 3)
-            # Uzak Dosyayı indir
-            fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=.5)
-            fileContent = fileContent.get('data', dict()).get('string') if isinstance(fileContent, dict) else None
-            gc.collect()
-            if fileContent:
+            try:
+                resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=.01)
+                print(f'<< resp', resp)
+                resp = resp.get('data', dict()).get('string') if isinstance(resp, dict) else None
+                # if resp:
+                #     try: resp = from64(resp.encode(encoding))
+                #     except Exception as ex: print(ex); continue
+                # Update List yok ise: oto-update iptal
+                if not resp or 'not found' in resp.lower():
+                    print('[INFO]', "'files.txt' not found, skipping...")
+                    continue
+                url = _url; lastError = None
+                break
+            except Exception as ex:
+                lastError = ex; print(f'[ERROR]', ex)
+                continue
+        if lastError:
+            print('[ERROR]', lastError); print_exception(lastError)
+        if lastError or not url:
+            return False
+        for name in resp.splitlines():
+            name = name.strip()
+            if not name:
+                continue
+            try:
+                busy(); fileUrl = f'{url}/{name}'
+                if not lcdIsBusy():
+                    lcd.write('UPDATING:      ', 1, 1)
+                    lcd.writeLine(name, 2, 3)
+                # Uzak Dosyayı indir
+                fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=.01)
+                fileContent = fileContent.get('data', dict()).get('string') if isinstance(fileContent, dict) else None
+                gc.collect()
                 if fileContent:
-                    fileContent = fileContent.replace('\r', '')
-                # try:
-                #     fileContent = from64(fileContent.encode(encoding))
-                #     if fileContent: fileContent = fileContent.replace('\r', '')
-                #     gc.collect()
-                # except Exception as ex2:
-                #     print(ex2); continue
-            # Yanıt boş veya yok ise sonrakine geç
-            if not fileContent or 'Not found' in fileContent:
-                print('  ... NOT FOUND')
+                    if fileContent:
+                        fileContent = fileContent.replace('\r', '')
+                    # try:
+                    #     fileContent = from64(fileContent.encode(encoding))
+                    #     if fileContent: fileContent = fileContent.replace('\r', '')
+                    #     gc.collect()
+                    # except Exception as ex2:
+                    #     print(ex2); continue
+                # Yanıt boş veya yok ise sonrakine geç
+                if not fileContent or 'Not found' in fileContent:
+                    print('  ... NOT FOUND')
+                    continue
+                if fileContent and splitext(name)[1] == '.py':
+                    fileContent = fileContent.rstrip() + '\n'
+                print(f'<< [{fileUrl}]')
+                localFile = name; localBackupFile = f'{name}.bak'
+                # Eğer önceki yedek varsa sil
+                if exists(localBackupFile):
+                    remove(localBackupFile)
+                # Önceki dosya varsa yedeğini oluştur
+                if exists(localFile):
+                    rename(localFile, localBackupFile)
+                # Yeni içerikle dosyayı yaz
+                success = False
+                print(f'    file: {localFile}')
+                with open(localFile, 'w', encoding=encoding) as f:
+                    try:
+                        f.write(fileContent); success = True
+                        lcd.writeIfReady('OK           ', 1, 0)
+                        print('        ...  UPDATED')
+                    except Exception as ex2:
+                        lcd.writeIfReady('ERR          ', 1, 0)
+                        print('        ...', ex2)
+                if not success and exists(localBackupFile):
+                    remove(localFile)
+                    rename(localBackupFile, localFile)
+                gc.collect()
+            except Exception as ex:
+                print('[ERROR]', ex); print_exception(ex)
                 continue
-            if fileContent and splitext(name)[1] == '.py':
-                fileContent = fileContent.rstrip() + '\n'
-            print(f'<< [{fileUrl}]')
-            localFile = name; localBackupFile = f'{name}.bak'
-            # Eğer önceki yedek varsa sil
-            if exists(localBackupFile):
-                remove(localBackupFile)
-            # Önceki dosya varsa yedeğini oluştur
-            if exists(localFile):
-                rename(localFile, localBackupFile)
-            # Yeni içerikle dosyayı yaz
-            success = False
-            print(f'    file: {localFile}')
-            with open(localFile, 'w', encoding=encoding) as f:
-                try:
-                    f.write(fileContent); success = True
-                    lcd.write('OK ', 1, 0)
-                    print('        ...  UPDATED')
-                except Exception as ex2:
-                    lcd.write('ERR', 1, 0)
-                    print('        ...', ex2)
-            if not success and exists(localBackupFile):
-                remove(localFile)
-                rename(localBackupFile, localFile)
-            gc.collect()
-        except Exception as ex:
-            print('[ERROR]', ex); print_exception(ex)
-            continue
-    lcd.clearIfReady()
+    finally:
+        lcd.clearLineIfReady(1)
+        lcd.clearLineIfReady(2)
     return True

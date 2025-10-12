@@ -29,55 +29,75 @@ async def run():
         led.clear()
         buzzer.beep(4000, .08)
         led.write('MOR')
-        await asleep(.001);
+        sleep(.01);
     buzzer.beep(4000, .3)
     sleep(.02); led.clear()
     print('app started')
     
+    if ws.isConnected():
+        ws.close()
     while not aborted:
         try:
             await loop()
+        except KeyboardInterrupt as ex:
+            aborted = True
+            print("\n[core0] stopped by user (KeyboardInterrupt)")
+            sleep(.5)
         except Exception as ex:
             print('[ERROR]', 'APP LOOP:', ex)
             print_exception(ex)
-    aborted = True
     lcd.clear(); lcd.write('SHUTDOWN', 1,1)
     await ws.close()
 
 def threadProc():
     global aborted
-    keypad_wait_secs = (hw.keypad.scan_interval_ms or 10) / 1000
-    rfid_wait_secs = (hw.rfid.scan_interval_ms or 10) / 1000
+    global_wait = local.threadLoop_globalWait_ms
+    wait_rfid = hw.rfid.scan_interval_ms
+    wait_keypad = hw.keypad.scan_interval_ms
+    if isLocalPy():
+        if wait_rfid:
+            wait_rfid += hw.rfid.simulation_interval_ms
+        if wait_keypad:
+            wait_keypad += hw.keypad.simulation_interval_ms
+    _now = ticks_ms(); lastTS_keypad = _now; lastTS_rfid = _now
     while not aborted:
-        katsayi = 20 if isIdle() else 1
+        katsayi = 5 if isIdle() else 1
+        sleep_ms(global_wait * katsayi)
         try:
-            if keypad_wait_secs:
-                sleep(rfid_wait_secs * katsayi)
-            if rfid is not None:
-                rfid.update()
-            if keypad_wait_secs:
-                sleep(keypad_wait_secs * katsayi)
-            if keypad is not None:
-                keypad.update()
+            if rfid is not None and wait_rfid and \
+                    ticks_diff(ticks_ms(), lastTS_rfid) >= (wait_rfid * katsayi):
+                try: rfid.update()
+                finally: lastTS_rfid = ticks_ms()
+            # print(f'[core1]  keypad_trigger_diff: [{ticks_diff(ticks_ms(), lastTS_keypad)}]')
+            if keypad is not None and wait_keypad and \
+                    ticks_diff(ticks_ms(), lastTS_keypad) >= (wait_keypad * katsayi):
+                try: keypad.update()
+                finally: lastTS_keypad = ticks_ms()
         except KeyboardInterrupt as ex:
             aborted = True
-            print("\n[thread] stopped by user (KeyboardInterrupt)")
+            print("\n[core1] stopped by user (KeyboardInterrupt)")
             return
         except Exception as ex:
             print('[ERROR]', ex)
             print_exception(ex)
+    print("\n[core1] stopped by abort signal")
 
 async def loop():
-    await asleep(1 if isIdle() else .01)
-    if not (await wifiCheck() and await connectToServerIfNot()): return
-    if not shared._updateCheckPerformed: await updateFiles()
-    lastTime = shared.lastTime
-    # rfid.update(); keypad.update()
+    await asleep(.5 if isIdle() else .001)
     await processQueues()
+    if not (await wifiCheck() and await connectToServerIfNot()):
+        return
+    if not shared._updateCheckPerformed:
+        await updateFiles()
+    # rfid.update(); keypad.update()
     if not lcdIsBusy():
         await wsCheckStatusIfNeed()
+    await processQueues()
+    if not lcdIsBusy():
         await updateMainScreen()
         # rfid.update(); keypad.update()
+    if not lcdIsBusy():
+        await processQueues()
 
 def initDevice():
     print('    init device')
@@ -128,11 +148,14 @@ async def wifiCheck():
 async def connectToServerIfNot():
     lastTime = shared.lastTime
     if ws.isConnected():
+        shared._appReady = True 
         lastTime.srvConnectMsg = None
         return True
     shared._appTitleRendered = False
     lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = None
     if not await wifiCheck():
+        shared._appReady = False
+        lcd.writeStatus('x', 1, -2)
         return False
     shared._inActionsCheck = False; lastTime = shared.lastTime
     srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
@@ -141,9 +164,16 @@ async def connectToServerIfNot():
         lcd.writeLineIfReady(f'{srvIP}:{srvPort}', 2, 1)
         lastTime.srvConnectMsg = monotonic()
     try:
-        return await ws.open()
+        result = await ws.open()
+        await ws.recv(timeout=.01)
+        # await ws.wsTalk('ping')
+        lcd.writeIfReady('*', 1, -2)
+        shared._appReady = True
+        return result
     except Exception as ex:
         print('[ERROR]', ex); print_exception(ex)
+        lcd.writeIfReady('?', 1, -2)
+        shared._appReady = False
         return False
 
 async def updateMainScreen():
@@ -183,9 +213,9 @@ async def updateMainScreen():
         shared._updateMainScreen_lastHashStr = hashStr
         shared._updateMainScreen_lastDebugText = text
         #  {"isNetMiktar": 15.0, "operNo": 8, "isFireMiktar": 0.0, "siradakiIsSayi": 0, "emirNox": "1688", "sonDurTS": "26.08.2025 17:35:28", "duraksamaKritik": false, "hatID": "030", "aktifCevrimSayisi": 0, "atananIsSayi": 1, "sonIslemTS": "26.08.2025 17:30:27", "sabitDuraksamami": 0, "operAciklama": "CNC DİK TORNA", "emirMiktar": 2.0, "operatorCagrimTS": null, "ip": "192.168.2.50", "onceUretMiktar": 15.0, "durumKod": "DR", "isSaymaSayisi": 1, "oemID": 9762, "urunAciklama": "9-11 KAMPANA İŞLEME", "urunKod": "KAMP01-9-11-6B", "perKod": "AR-GE01", "isSaymaInd": 0, "durNedenKod": "06", "sinyalKritik": true, "emirTarih": "25.06.2025 00:00:00", "sonAyrilmaDk": 5.22611, "perIsim": "ENES VURAL", "oemgerceklesen": 35.0, "onceCevrimSayisi": 15, "isID": 3, "aciklama": "CNC1", "ekBilgi": "", "seq": 1, "oemistenen": 2.0, "id": "CNC01", "durNedenAdi": "AYRILMA", "aktifUretMiktar": 0.0, "isIskMiktar": 0.0, "hatAciklama": "TALASLI IMALAT", "basZamanTS": "26.08.2025 17:30:14", "maxAyrilmaDk": 5.22611}
-        if not (lastTime and shared._updateMainScreen_lastUrunKod != urunKod):
+        if not (lastTime and shared._updateMainScreen_lastUrunKod == urunKod):
             lcd.writeLineIfReady(f"{urunKod}", 0, 0)
-        if not (lastTime and shared._updateMainScreen_lastPerKod != perKod):
+        if not (lastTime and shared._updateMainScreen_lastPerKod == perKod):
             lcd.writeLineIfReady(f"{perKod}", 1, 0)
         lcd.writeLineIfReady(f"U:{onceUretMiktar}+{aktifUretMiktar} | S:{isSaymaInd}/{isSaymaSayisi}", 2, 0)
         lcd.writeLineIfReady(f"D:{durumKod} | E:{emirMiktar}", 3, 0)
@@ -202,7 +232,10 @@ async def wsCheckStatusIfNeed():
     if not ws.isConnected(): return False
     if not statusShouldBeChecked(): return False
     try:
-        rec = await ws.wsTalk(api='tezgahBilgi', timeout=.5)
+        for _ in range(0, 3):
+            await ws.recv(timeout=.01)
+            await asleep(.001)
+        rec = await ws.wsTalk(api='tezgahBilgi')
         if rec:
             rec = rec[0] if isinstance(rec, list) else rec
             shared.curStatus = rec
@@ -234,41 +267,6 @@ async def wsCheckStatusIfNeed():
         print("[ERROR] wsStatus:", ex)
         print_exception(ex)
     return False
-async def actionsCheckAndExec():
-    # print('actionsCheckAndExec')
-    actions = await actionsCheck()
-    await actionsExec(actions)
-async def actionsCheck():
-    localIP = ip2Str(local.ip)
-    # print(f'    connected = {connected} | shared._inActionsCheck = {shared._inActionsCheck}')
-    if not ws.isConnected():
-        shared._inActionsCheck = False
-        # if not lcdIsBusy(): lcd.clearLine(1)
-        return None
-    if not shared._inActionsCheck:
-        # lcd.clearLineIfReady(range(1, 3));
-        # lcd.writeIfReady('KOMUT BEKLENIYOR', 1, 2)
-        print('awaiting remote command')
-        shared._inActionsCheck = True
-    resp = targetIP = actions = None
-    try:
-        resp = await ws.wsTalk('readTemp', args={ 'key': 'mes-py', 'stream': True }, timeout=.02)
-    except (OSError, RuntimeError) as ex:
-        resp = None
-    except Exception as ex:
-        print('[ERROR]', 'APP wsRecv:', ex)
-        print_exception(ex)
-    if not resp or (isinstance(resp, dict) and bool(resp.get('isError'))):
-        return None
-    print(f'actionsCheck interrupt: {json.dumps(resp)}')
-    if isinstance(resp, list): resp = { 'actions': resp }
-    targetIP = resp.get('ip'); _actions = resp.get('actions')
-    if _actions:
-        actions = _actions
-    if targetIP and targetIP != localIP:                                                                        # broadcast message match to local ip
-        print(f'[IGNORE] broadcast message => targetIP: [{targetIP} | localIP: [{localIP}]')
-        actions = None
-    return actions
 async def actionsExec(actions):
     if not actions: return False
     print('  actions=', actions)
@@ -321,6 +319,7 @@ async def processQueues():
         func = shared._onKeyReleased if released else shared._onKeyPressed
         print('[DEBUG]  ', 'released' if released else 'pressed', f'key: [{key}] | rfid: [{rfid}] | handler: [{func}]')
         async_task(_clear)
+        busy()
         try:
             result = func(rec)
             if iscoroutine(result):
@@ -371,30 +370,25 @@ async def onKeyReleased(rec):
 
 async def onKeyPressed_defaultAction(rec):
     key, rfid, duration, ts, tsDiff, _ = rec
-    print(f'{key} press')
-    key = key.lower(); lastTime = shared.lastTime._keyPress
-    shared.lastTime._keyPress = monotonic()
-    # if lastTime and ticks_diff(ticks_ms(), lastTime) < 100:
-    #     return False
-    # delayMS = int((monotonic() - lastTime) * 1000) if lastTime else 0
+    key = key.lower(); appReady = shared._appReady
+    print(f'{key} press', f' [appReady={appReady}]')
     lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
-    shared.lastTime._keySend = monotonic()
-    # if key == '0':
-    #    getMenu('main').run()
     if key == 'f1':
         DeviceInfoPart().run()
-    elif key == 'f2':
+    elif appReady and key == 'f2':
         mnu = getMenu_duraksamaNedenleri()
         if mnu: mnu.run()
     # elif key == 'x':
     #    from part_input import InputPart
     #    InputPart(_title = 'Input Test', _val = 'cik').run()
-    else:
+    elif appReady:
         _id = 'secondary' if key == 'enter' else key
         try:
+            if not ws.isConnected():
+                return False
             # if not await ws.wsTalk('fnIslemi', args={ 'id': _id, 'delayMS': duration }, timeout=1):
             args = { 'id': _id, 'duration': None, 'ts': ts, 'tsDiff': tsDiff, 'released': False }
-            if not await ws.wsTalk('fnIslemi', args=args):
+            if not await ws.wsSend('fnIslemi', args=args):
                 raise RuntimeError()
             buzzer.beep(3000, .2)
             # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
@@ -409,16 +403,14 @@ async def onKeyPressed_defaultAction(rec):
             )
             keyQueue_push(item)
             buzzer.beep(500, 1)
+            await asleep(.2)
         finally:
             await wsCheckStatusIfNeed()
     return True
 async def onKeyReleased_defaultAction(rec):
     key, _, duration = rec
     print(f'{key} released | duration = {duration}')
-    key = key.lower(); lastTime = shared.lastTime._keyRelease
-    shared.lastTime._keyRelease = monotonic()
-    if lastTime and ticks_diff(ticks_ms(), lastTime) < 50:
-        return False
+    key = key.lower();
     if key == 'esc' and duration >= 2:
         from app import reboot
         reboot()

@@ -76,12 +76,11 @@ class Keypad(BaseKeypad):
         simulation_interval_ms = hw.keypad.simulation_interval_ms
         if not simulation_interval_ms:
             return False
-        sleep(simulation_interval_ms / 1000)
         return super().update()
     def scanKeyState(self):
         """ (released, key) or None """
         super().scanKeyState()
-        l = self.state.last
+        s = self.state; l = s.last
         # last = [key, time, tsDiff, released]
         l[0] = 'enter'
         l[1] = ticks_ms()
@@ -95,11 +94,17 @@ class LCD(BaseLCD):
         super().__init__()
         print('! lcd init')
     def write(self, data, row=0, col=0, _internal=False):
-        cur = self._buffer[row]; old = ''.join(cur[col : col + len(data)])
+        # cur = self._buffer[row]
+        rcs = self._rc_status
+        old = ''.join(self._buffer[row][col : col + len(data)])
         result = super().write(data, row, col)
-        if not (_internal or data == old):
+        new = ''.join(self._buffer[row][col : col + len(data)])
+        if not (_internal or new == old or (row, col) == rcs):
+        # if not (_internal or new == old):
             self._printBuffer()
         return result
+    def _writeChar(self, ch, row=None, col=None):
+        pass
     def clearLine(self, row):
         result = super().clearLine(row)
         # self._printBuffer()
@@ -144,7 +149,6 @@ class RFID(BaseRFID):
         simulation_interval_ms = hw.rfid.simulation_interval_ms
         if not simulation_interval_ms:
             return False
-        sleep(simulation_interval_ms / 1000)
         return super().update()
     def read(self):
         super().read()
