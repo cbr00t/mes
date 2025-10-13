@@ -22,8 +22,6 @@ wifi.passwd                         =  'DAMLACIK'
 
 
 
-
-
 # if isLocalPy():
 #     local.idleTime = 2
 

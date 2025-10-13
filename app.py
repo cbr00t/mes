@@ -242,18 +242,37 @@ async def wsCheckStatusIfNeed():
     if not statusShouldBeChecked(): return False
     try:
         await ws.recv(.001)
-        try: rec = await ws.wsTalk(api='tezgahBilgi', timeout=.3)
+        rec = None
+        try:
+            for i in range(0, 5):
+                rec = await ws.wsTalk(api='tezgahBilgi', timeout=.5)
+                if rec:
+                    break
+                else:
+                    await asleep_ms(10)
         except Exception as ex:
             print(ex)
             print_exception(ex)
         if not rec:
-            rec = { 'urunKod': 'MAKINE TANIMI VEYA', 'perKod': 'BEKLEYEN IS YOK', 'durumKod': '', 'ledDurum': 'SIYAH', '_exec': None }
+            rec = {
+                'urunKod': 'MAKINE TANIMI VEYA', 'perKod': 'BEKLEYEN IS YOK',
+                'durumKod': '', 'ledDurum': 'ROSE', '_exec': None
+            }
         if rec:
             rec = rec[0] if isinstance(rec, list) else rec
+            if rec.get('isError') and bool(rec.get('isError')):
+                code = rec.get('code') or rec.get('rc')
+                errorText = 'IP-CIHAZ TANIMI YOK' if code == 'invalidMachine' \
+                            else rec.get('errorText')
+                rec = {
+                    'urunKod': errorText, 'perKod': ip2Str(local.ip),
+                    'durumKod': '', 'ledDurum': 'ORANGERED', '_exec': None
+                }
             shared.curStatus = rec
             ledDurum = rec.get('ledDurum') if isinstance(rec, dict) else None
             durumKod = rec.get('durumKod') if isinstance(rec, dict) else None
             _exec = rec.get('_exec') if isinstance(rec, dict) else None
+            print(f'[DEBUG]  urunKod = [{rec.get("urunKod")}] | perKod = [{rec.get("perKod")}]')
             print(f'[DEBUG]  durumKod = [{durumKod}] | ledDurum = [{ledDurum}]')
             print(f'[DEBUG]  _exec = [{_exec}] | ledDurum = [{ledDurum}]')
             if ledDurum:
@@ -275,6 +294,7 @@ async def wsCheckStatusIfNeed():
                         actions = None
                 if actions:
                     await actionsExec(actions)
+                gc.collect()
             return True
     except Exception as ex:
         print("[ERROR] wsStatus:", ex)

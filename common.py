@@ -307,14 +307,16 @@ class Device(NS):
 
 # User Functions
 def getUpdateUrls():
-    from config import server as srv
+    from config import local, server as srv
     updateUrl_postfix = srv.updateUrl_postfix or ''
     # ip = ip2Str(srv.ip)
-    ip = 'localhost'
-    return [
-        f'http://{ip}:{port}{updateUrl_postfix}'
-        for port in srv.updatePorts
-    ]
+    ip = 'localhost'; localIP = ip2Str(local.ip) if local.ip else None
+    result = []
+    for port in srv.updatePorts:
+        result.append(f'http://{ip}:{port}{updateUrl_postfix}')
+        if localIP:
+            result.append(f'http://{ip}:{port}{updateUrl_postfix}/{localIP}')
+    return result
 def getWSUrlBase(https = None, ip = None, port = None):
     from config import server as srv
     if https is None: https = False
@@ -328,7 +330,9 @@ def getWSUrl(qs = None, wsPath = None, api = None, https = None):
     wsPath = (wsPath if wsPath else srv.wsPath).strip('/ ')
     result = f'{base}/{wsPath}'
     if api: result += f'/{api}'
-    result += f'/?.ip={ip2Str(local.ip)}'
+    result += '/?'
+    if local.ip:
+        result += f'.ip={ip2Str(local.ip)}'
     if qs and isinstance(qs, dict):
         for key, value in qs.items():
             result += f'&{str(key)}'

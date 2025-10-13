@@ -21,6 +21,7 @@ class I2cLcd(LcdApi):
         self.i2c = i2c
         self.i2c_addr = i2c_addr
         self.backlight = 1
+        utime.sleep_ms(5)
         self.i2c.writeto(self.i2c_addr, bytes([0]))
         utime.sleep_ms(20)   # Allow LCD time to powerup
         # Send reset 3 times
@@ -70,7 +71,7 @@ class I2cLcd(LcdApi):
                 ((cmd & 0x0f) << SHIFT_DATA))
         self.i2c.writeto(self.i2c_addr, bytes([byte | MASK_E]))
         self.i2c.writeto(self.i2c_addr, bytes([byte]))
-        utime.sleep_ms(8)
+        utime.sleep_ms(5)
         
         if cmd <= 3:
             # The home and clear commands require a worst case delay of 4.1 msec
@@ -84,13 +85,13 @@ class I2cLcd(LcdApi):
                 (((data >> 4) & 0x0f) << SHIFT_DATA))
         self.i2c.writeto(self.i2c_addr, bytes([byte | MASK_E]))
         self.i2c.writeto(self.i2c_addr, bytes([byte]))
-        utime.sleep_us(5)
+        utime.sleep_ms(5)
         
         byte = (MASK_RS |
                 (self.backlight << SHIFT_BACKLIGHT) |
                 ((data & 0x0f) << SHIFT_DATA))      
         self.i2c.writeto(self.i2c_addr, bytes([byte | MASK_E]))
         self.i2c.writeto(self.i2c_addr, bytes([byte]))
-        utime.sleep_us(5)
+        utime.sleep_us(3)
         
         # gc.collect()

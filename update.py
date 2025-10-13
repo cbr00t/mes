@@ -20,6 +20,7 @@ async def updateFiles():
         for _url in urls:
             if not _url:
                 continue
+            gc.collect()
             try:
                 resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=.5)
                 print(f'<< resp', resp)
@@ -97,4 +98,5 @@ async def updateFiles():
     finally:
         lcd.clearLineIfReady(1)
         lcd.clearLineIfReady(2)
+        gc.collect()
     return True
