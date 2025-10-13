@@ -39,10 +39,13 @@ class BaseLCD:
         self.move(row, col)
         for i, ch in enumerate(data):
             if col + i < colCount:
-                old = buf[row][col+i] or ''
-                if ch != old:
-                    buf[row][col+i] = ch
-                    self._writeChar(ch)
+                # old = buf[row][col+i] or ''
+                # if ch == old and ch != ' ':
+                #     if i:
+                #         self.move(row, col+i)
+                #     continue
+                buf[row][col+i] = ch
+                self._writeChar(ch)
         return self
     def _writeChar(self, ch, row=None, col=None):
         return self
@@ -55,7 +58,7 @@ class BaseLCD:
             return self
         cols = hw.lcd.cols
         data = ' ' * cols
-        self.write(data, row, 0, True)
+        self.write(data, row, 0)
         self._lastWriteTime = None
         return self
     def writeLine(self, data, row=0, col=0, _internal=False):
@@ -84,10 +87,13 @@ class BaseLCD:
         self._buffer = [['' for _ in range(cols)] for _ in range(rows)]
         return self
     def writeIfReady(self, data, row=0, col=0, _internal=False):
-        if lcdIsBusy(): return self
+        if lcdIsBusy():
+            return self
         if not _internal:
-            cur = self._buffer[row]; old = ''.join(cur[col : col + len(data)])
-            if data == old: return self
+            cur = self._buffer[row]
+            old = ''.join(cur[col : col + len(data)])
+            if data == old:
+                return self
         return self.write(data, row, col, _internal)
     def writeLineIfReady(self, data, row=0, col=0, _internal=False):
         if lcdIsBusy(): return self

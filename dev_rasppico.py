@@ -70,11 +70,9 @@ class WebSocket(BaseWebSocket):
             raise ImportError("uwebsockets/websockets client module not found")
         url = self.url
         # Bağlantı (awaitable ya da sync olabilir → her iki yolu da dene)
-        conn = _ws_client.connect(url)
-        if hasattr(conn, "__await__"):
-            ws = await conn
-        else:
-            ws = conn
+        ws = _ws_client.connect(url)
+        if iscoroutine(ws):
+            ws = await ws
         # bazı portlarda send/recv async değil; wrapper gerekmez, üst sınıf zaten ikisini de destekliyor
         self.ws = ws
         return self.isConnected()
@@ -196,7 +194,7 @@ class LCD(BaseLCD):
         i2c = self.i2c = I2C(c._id, scl=Pin(c.scl), sda=Pin(c.sda), freq=c.freq) if 'I2C' in globals() else None
         lcd = self.lcd = I2cLcd(i2c, addr, c.rows, c.cols) if 'I2cLcd' in globals() else None
         self.unblink()
-        self.showCursor()
+        self.hideCursor()
         self.clear()
         # lcd.hal_write_command(lcd.LCD_ENTRY_MODE)
     def clear(self):
@@ -221,7 +219,7 @@ class LCD(BaseLCD):
             if not (row is None or col is None):
                 lcd.move_to(col, row)
             lcd.putchar(ch)
-        return super._writeChar(ch, row, col)
+        return super()._writeChar(ch, row, col)
     def move(self, row=0, col=0):
         super().move(row, col)
         self.lcd.move_to(col, row)
@@ -268,7 +266,7 @@ class LED(BaseLED):
         strip = self.strip
         strip.fill(color)
         strip.show()
-        sleep(.001)
+        sleep_ms(2)
         return self
     def clear(self):
         super().clear()
@@ -283,13 +281,26 @@ class LED(BaseLED):
 class RFID(BaseRFID):
     def __init__(self):
         super().__init__()
+        s = self.state
+        s.iterAfterLastGC = 0
         reader = self.reader = MFRC522(spi_id=0,sck=2,miso=4,mosi=3,cs=1,rst=0) if isMicroPy() else None
         if reader is not None:
             reader.init()
     def read(self):
-        super().read()
-        uid = critical(self._read)
-        sleep(.02)
+        super().read(); uid = None
+        try: uid = critical(self._read)
+        except MemoryError as ex:
+            print(ex)
+        except Exception as ex:
+            print(ex)
+            print_exception(ex)
+        finally:
+            s = self.state
+            if s.iterAfterLastGC >= 10:
+                gc.collect()
+            else:
+                s.iterAfterLastGC += 1
+        sleep_ms(5)
         return uid2Str(uid) if uid else None
         # return reader.tohexstring(uid)
     def _read(self):

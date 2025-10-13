@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 11)
+    version                         = (1, 1, 12)
 )
 
 
@@ -22,7 +22,7 @@ local = NS(
     subnet                          =  (255, 255, 255, 0),
     dns                             =  (1, 1, 1, 1),
     idleTime                        =  30 * 60,                           # sn
-    threadLoop_globalWait_ms        =  10
+    threadLoop_globalWait_ms        =  5
 )
 
 ## Ana Makine (Server) Ayarları
@@ -34,13 +34,13 @@ server = NS(
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  True,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
-    statusCheckInterval             =  1.0,                                # in secs. ( <= 0 Or None ) = no status check (for LCD Display)
-    socketTimeout                   =  0.01                                # in secs. default value
+    statusCheckInterval             =  1.5,                                # sn
+    socketTimeout                   =  0.5                                 # sn
 )
 
 wifi = NS(
-    ssid                            = '',
-    passwd                          = '',
+    ssid                            = 'SKYMES',
+    passwd                          = '00000000',
     timeout                         = 10
 )
 
@@ -68,27 +68,28 @@ hw = NS(
             ['f3', '7', '8', '9', 'down'],
             ['f4', 'esc', '0', 'enter', None]
         ],
-        debounce_ms = 5,
-        scan_interval_ms = 20,
+        debounce_ms = 1,
+        scan_interval_ms = 1,
         simulation_interval_ms = 5_000
     ),
     rfid = NS(
-        scan_interval_ms = 20,
+        scan_interval_ms = 100,
         simulation_interval_ms = 25_000
     ),
     lcd = NS(
         rows = int(4), cols = int(20),
-        rc_status = (1, -2), clearDelay = 500,
-        _id = 1, scl = 27, sda = 26,
-        freq = 400_000, addr = 0x27
+        rc_status = (1, -2), clearDelay = 0,
+        _id = 1, scl = 27, sda = 26, addr = 0x27,
+        freq = 2_400_000
+         # freq = 400_000
     ),
-    led = NS(count = 1, pin = 22, brightness = 200),
+    led = NS(count = 1, pin = 22, brightness = 1_000),
     buzzer = NS(pin = 21, freq = 440, duration = 0.15, pause = 0.1)
 )
 
 
-if isLocalPy():
-    local.threadLoop_globalWait_ms *= 10
+# if isLocalPy():
+#     local.threadLoop_globalWait_ms *= 10
 
 
 from config_override import *

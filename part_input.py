@@ -26,6 +26,7 @@ class InputPart(Part):
         # set
         value = value or 0;
         self._curPos = 0 if value <= 0 else min(value, _maxLen0)
+        self.onAttrChanged(renderFunc=self._renderInputs)
         return self
     def onKeyPressed_araIslem(self, key, _key, duration=None):
         result = super().onKeyPressed_araIslem(key, _key, duration)

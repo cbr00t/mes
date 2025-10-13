@@ -44,7 +44,7 @@ class BaseKeypad:
             busy()
             
             if buzzer:
-                buzzer.beep(5000, .05)
+                buzzer.beep(3500, .1)
             
             # reset sadece press eventlerinde
             if not released:

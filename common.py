@@ -360,7 +360,7 @@ def isIdle():
         return False
     return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) > idleTime
 def isBusy():
-    return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) <= 300
+    return shared.lastTime.busy and ticks_diff(ticks_ms(), shared.lastTime.busy) <= 10
 def busy():
     shared.lastTime.busy = ticks_ms()
 def lcdIsBusy():
@@ -373,15 +373,12 @@ def lcdCanBeCleared():
     # print('lcd_lastWriteTime =', lastTime)
     return not isBusy and lastTime and ticks_diff(ticks_ms() - lastTime) >= clearDelay
 def getStatusCheckInterval():
-    if isBusy():
-        return None
     from config import server as srv
     intv = srv.statusCheckInterval or 0
     if isIdle():
         intv *= 10
     return intv if intv else None
 def statusShouldBeChecked():
-    if isBusy(): return False 
     intv = getStatusCheckInterval() * 1_000
     lastMS = shared.lastTime.statusCheck or 0
     return intv and ticks_diff(ticks_ms(), lastMS) > intv

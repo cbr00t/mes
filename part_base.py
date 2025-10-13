@@ -32,10 +32,11 @@ class Part(NS):
         return self
     def title(self, value=None):
         # get
-        if value is None: return self._title or ''
+        if value is None:
+            return self._title or ''
         # set
         self._title = value
-        self.onAttrChanged()
+        self.onAttrChanged(renderFunc=self._renderTitle)
         return self
     def editable(self):
         return False
@@ -58,7 +59,7 @@ class Part(NS):
         # set
         value = value or 0
         self._maxLen = limit if value < 0 else min(value, limit)
-        self.onAttrChanged()
+        self.onAttrChanged(renderFunc=self._renderInputs)
         return self  
     def curInputInd(self, value=None):
         count = len(self.inputs())
@@ -69,7 +70,7 @@ class Part(NS):
         # set
         if 0 <= value < count: self._curInputInd = value
         self._adjustScroll()    # Scroll pozisyonunu güncelle
-        self.onAttrChanged()
+        self.onAttrChanged(renderFunc=self._renderInputs)
         return self
     def curInputName(self, value=None):
         _inputs = self.inputs(); curInd = self.curInputInd()
@@ -92,7 +93,7 @@ class Part(NS):
         return self._scrollPos
         # set
         self._scrollPos = value
-        self.onAttrChanged(defer)
+        self.onAttrChanged(renderFunc=self._renderInputs)
         return self
     @classmethod
     def Run(cls, *args, **kwargs):
@@ -130,6 +131,7 @@ class Part(NS):
             out = Part.stdout(); out.clear()
             shared._appTitleRendered = shared._inActionsCheck = False
             shared.lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = shared._updateMainScreen_lastHashStr = None
+            shared._updateMainScreen_lastUrunKod = _updateMainScreen_lastPerKod = None
             updateMainScreen()
         print('part stack len:', len(Part.stack()))
     def canClose(self):
@@ -163,10 +165,14 @@ class Part(NS):
                 return True
             elif _key == 'up':
                 self.selectPrevInput()
+                return True
             elif _key == 'down':
                 self.selectNextInput()
-            else: return False
-        if result is None: result = True
+                return True
+            else:
+                return False
+        if result is None:
+            result = True
         self.render()
         return result                                                                                              # key handled by part or Internal result
     def onKeyPressed_araIslem(self, key, _key, duration=None):
@@ -176,6 +182,8 @@ class Part(NS):
         self._render_son(); self._rendered = True
     def _render_ilk(self):
         self.out_clear()
+        self._renderTitle()
+    def _renderTitle(self):
         # print('title:', self.title())
         self.out_write(self.title() or '', 0, 1)
     def _renderInputs(self):
@@ -195,11 +203,13 @@ class Part(NS):
             self.out_write(data, r, 0)
     def _render_son(self):
         pass
-    def onAttrChanged(self, defer=None):
-        if defer is None: defer = True
+    def onAttrChanged(self, defer=None, renderFunc=None):
+        if defer is None:
+            defer = False
         if not defer and self.active():
+            renderFunc = renderFunc or self.render
             self._rendered = False
-            self.render()
+            renderFunc()
         return self
     def selectFirstInput(self):
         return self.selectInput('_first')
@@ -219,8 +229,10 @@ class Part(NS):
               old + 1 if name == '_next' else \
               old - 1 if name == '_prev' else \
               self.getInput(name)
-        if new is not None: self.curInputInd(new)
+        if new is not None:
+            self.curInputInd(new)
         print('selectInput:', name, new, ' old:', old)
+        self.onAttrChanged(renderFunc=self._renderInputs)
         return self
     def addInput(self, key, value):
         self.inputs().append((key, value))

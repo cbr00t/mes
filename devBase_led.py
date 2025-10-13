@@ -11,8 +11,15 @@ class BaseLED:
         )
         pass
     def write(self, color):
+        if color is None:
+            color = ''
         if isinstance(color, str):
             color = color.upper()
+            color = color or 'KAPALI'
+            if color == 'KAPALI':
+                self.brightness(hw.led.brightness)
+                return self
+            
             # (G, R, B)
             color = (
                 (0x00, 0x00, 0x00) if color == 'SIYAH'   or color == 'BLACK'   else \
@@ -22,7 +29,7 @@ class BaseLED:
                 (0xFF, 0x00, 0x00) if color == 'KIRMIZI' or color == 'RED'     else \
                 (0xFF, 0xFF, 0x00) if color == 'SARI'    or color == 'YELLOW'  else \
                 (0xFF, 0x00, 0xFF) if color == 'MOR'     or color == 'PURPLE'  else \
-                (0xFF, 0x80, 0x00) if color == 'TURUNCU' or color == 'ORANGE'  else \
+                (0xAA, 0x40, 0x00) if color == 'TURUNCU' or color == 'ORANGE'  else \
                 (0x00, 0xFF, 0xFF) if color == 'TURKUAZ' or color == 'CYAN'    else \
                 None
             )
@@ -33,6 +40,8 @@ class BaseLED:
             return self
         result = self._write(color)
         l[0] = color
+        if not l[1]:
+            self.brightness()
         return result
     def _write(self, color):
         return self

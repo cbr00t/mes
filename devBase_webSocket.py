@@ -63,11 +63,13 @@ class BaseWebSocket:
         return True
     # ---- ws helpers --------------------------------------------------------
     async def send(self, text: str):
-        if not self.ws:
+        ws = self.ws
+        if not ws:
             raise RuntimeError('WebSocket not connected')
         lcd = shared.dev.lcd
         try:
-            send_fn = getattr(self.ws, 'send', None)
+            ws.settimeout(.1)
+            send_fn = getattr(ws, 'send', None)
             if not callable(send_fn):
                 raise RuntimeError('ws.send not available')
             # print('[DEBUG] ws before send')
@@ -78,8 +80,8 @@ class BaseWebSocket:
             if iscoroutine(res):
                 res = await res
             # print('[DEBUG] ws after send - await', res)
-            self._lastSend = monotonic()
-            await asleep(.05)
+            self._lastSend = ticks_ms()
+            await asleep_ms(10)
             if lcd:
                 lcd.writeStatus('*')
             # debug:
@@ -94,15 +96,20 @@ class BaseWebSocket:
             await self.close()
             return False
     async def recv(self, timeout=None):
-        if not self.ws:
+        ws = self.ws
+        if not ws:
             return None
         lcd = shared.dev.lcd
+        timeout = timeout or local.socketTimeout
+        # restoreIndicator = False
         try:
-            recv_fn = getattr(self.ws, 'recv', None)
+            ws.settimeout(timeout or None)
+            recv_fn = getattr(ws, 'recv', None)
             if not callable(recv_fn):
                 raise RuntimeError('ws.recv not available')
             # print('[DEBUG] ws before recv')
-            if lcd:
+            if lcd and not timeout > .1:
+                # restoreIndicator = True
                 lcd.writeStatus('v')
             res = recv_fn()
             # print('[DEBUG] ws before recv - await')
@@ -113,10 +120,10 @@ class BaseWebSocket:
             # print('[DEBUG] ws after recv - await')
             if text is None:
                 return None
-            self._lastRecv = monotonic()
-            await asleep(.01)
-            if lcd:
-                lcd.writeStatus('*')
+            self._lastRecv = ticks_ms()
+            await asleep_ms(1)
+            # if lcd and restoreIndicator:
+            #     lcd.writeStatus('*')
             return text
         # except asyncio.TimeoutError:
         #     print('[WARN] ws recv timeout')

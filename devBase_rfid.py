@@ -29,7 +29,11 @@ class BaseRFID:
                 'kart', rfid, None, ts, None, None
             )
             shared.queues.key.push(rec)
+            if buzzer:
+                buzzer.beep(2500, .2)
             return True
+        except MemoryError as ex:
+            print("RFID tarama hatası:", ex)
         except Exception as ex:
             print("RFID tarama hatası:", ex)
             print_exception(ex)

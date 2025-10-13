@@ -21,7 +21,7 @@ async def updateFiles():
             if not _url:
                 continue
             try:
-                resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=.01)
+                resp = await ws.wsTalk('webRequest', None, { 'url': f'{_url}/files.txt', 'output': 'str', 'stream': False }, timeout=.5)
                 print(f'<< resp', resp)
                 resp = resp.get('data', dict()).get('string') if isinstance(resp, dict) else None
                 # if resp:
@@ -50,7 +50,7 @@ async def updateFiles():
                     lcd.write('UPDATING:      ', 1, 1)
                     lcd.writeLine(name, 2, 3)
                 # Uzak Dosyayı indir
-                fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=.01)
+                fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=3)
                 fileContent = fileContent.get('data', dict()).get('string') if isinstance(fileContent, dict) else None
                 gc.collect()
                 if fileContent:
