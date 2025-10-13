@@ -68,7 +68,8 @@ class BaseWebSocket:
             raise RuntimeError('WebSocket not connected')
         lcd = shared.dev.lcd
         try:
-            ws.settimeout(.1)
+            if hasattr(ws, 'settimeout'):
+                ws.settimeout(.1)
             send_fn = getattr(ws, 'send', None)
             if not callable(send_fn):
                 raise RuntimeError('ws.send not available')
@@ -103,7 +104,8 @@ class BaseWebSocket:
         timeout = timeout or local.socketTimeout
         # restoreIndicator = False
         try:
-            ws.settimeout(timeout or None)
+            if hasattr(ws, 'settimeout'):
+                ws.settimeout(timeout or None)
             recv_fn = getattr(ws, 'recv', None)
             if not callable(recv_fn):
                 raise RuntimeError('ws.recv not available')

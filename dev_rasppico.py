@@ -306,11 +306,14 @@ class RFID(BaseRFID):
     def _read(self):
         s = self.state; l = s.last
         lastUID = l[0]; reader = self.reader
-        stat = tag_type = None
-        (stat, tag_type) = reader.request(reader.REQIDL)
+        # stat = tag_type = None
+        stat, tag_type = reader.request(reader.REQIDL)
+        # print('debug4')
         if stat != reader.OK:
+            # print('reader-stat', stat)
             self.reset()
             return None
+        print('f[DEBUG]  rfid first detect  [stat = {stat, tag_type}]')
         (stat, uid) = reader.SelectTagSN()
         # uid = int.from_bytes(bytes(uid), byteorder) if uid else 0
         uid = uid[0] | (uid[1] << 8) | (uid[2] << 16) | (uid[3] << 24) if uid else 0
@@ -320,7 +323,7 @@ class RFID(BaseRFID):
         if stat != reader.OK:
             self.reset()
             return None        
-        # print('debug6')
+        print('debug6')
         if (isLocalPy()):
             print('Card detected: ', uid2Str(uid))                              # DEBUG
         if reader.IsNTAG():

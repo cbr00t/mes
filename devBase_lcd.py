@@ -48,6 +48,7 @@ class BaseLCD:
                 self._writeChar(ch)
         return self
     def _writeChar(self, ch, row=None, col=None):
+        sleep_ms(0)
         return self
     def clearLine(self, row):
         if isinstance(row, range):

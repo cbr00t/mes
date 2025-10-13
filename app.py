@@ -138,7 +138,7 @@ def reboot():
     if isMicroPy(): import machine
     print('rebooting...')
     lcd.write('REBOOTING...    ', 3, 2)
-    await asleep_ms(50);
+    sleep_ms(50)
     if isMicroPy(): machine.reset()
 
 async def wifiWait():
