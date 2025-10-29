@@ -426,7 +426,9 @@ async def onKeyPressed_defaultAction(rec):
             # lcd.writeLineIfReady(f'* [{key}] GITTI', 2, 0)
         except Exception as ex:
             # lcd.writeLineIfReady(f'* WS ILETISIM SORUNU', 2, 0)
-            print_exception(ex)
+            print(ex)
+            if not isinstance(ex, RuntimeError):
+                print_exception(ex)
             # lcd.writeLineIfReady(f'[{key}] KUYRUGA', 2, 1)
             # keyQueue_push({  'ts': monotonic(), 'id': _id, 'delayMS': duration })
             item = (

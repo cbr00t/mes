@@ -29,6 +29,7 @@ class BaseRFID:
                 'kart', rfid, None, ts, None, None
             )
             shared.queues.key.push(rec)
+            buzzer = shared.dev.buzzer
             if buzzer:
                 buzzer.beep(2500, .2)
             return True
