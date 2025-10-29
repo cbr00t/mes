@@ -282,13 +282,16 @@ async def wsCheckStatusIfNeed():
             shared.lastTime.statusCheck = ticks_ms()            
             if _exec:
                 _exec = json.loads(_exec) if isinstance(_exec, str) else _exec
-                actions = _exec if _exec and isinstance(_exec, dict) and not bool(_exec.get('isError')) else None
+                actions = None
+                if not isinstance(_exec, list):
+                    actions = _exec if _exec and isinstance(_exec, dict) and not bool(_exec.get('isError')) else None
                 if actions:
                     print(f'actionsCheck interrupt: {json.dumps(_exec)}')
                     if isinstance(actions, list):
                         actions = { 'actions': _exec }
-                    localIP = ip2Str(local.ip); targetIP = actions.get('ip')
-                    actions = actions.get('actions')
+                    localIP = ip2Str(local.ip)
+                    targetIP = actions.get('ip')
+                    actions = actions.get('actions') or actions
                     if targetIP and targetIP != localIP:                                                                        # broadcast message match to local ip
                         print(f'[IGNORE] broadcast message => targetIP: [{targetIP} | localIP: [{localIP}]')
                         actions = None
@@ -304,7 +307,8 @@ async def actionsExec(actions):
     if not actions: return False
     print('  actions=', actions)
     for item in actions:
-        busy(); action = item.get('action') or item.get('cmd')
+        busy()
+        action = item.get('action') or item.get('cmd')
         print('<< action:', action)
         if not action: continue 
         handler = getattr(h, action, None)
@@ -318,10 +322,11 @@ async def actionsExec(actions):
             result = handler(*args)                                                                                     # ← [js]  handler.call(this, ...args) karşılığı
             if callable(result):
                 result = result(*args)
-            try: result = await result
-            except: pass
+            if iscoroutine(result):
+                result = await result
         except Exception as ex:
             print(f'[ERROR]  handler execution failed: {ex}')
+            print_exception(ex)
             # await ws.wsSend('errorCallback', { 'data': f'{action} action calistirilamadi: {ex}' })
     return True
 async def processQueues():

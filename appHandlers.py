@@ -8,11 +8,41 @@ class AppHandlers:
     
     ## Handler API Interface
     async def exec(self, code):
-        result = exec(code, globals())
-        if callable(result):
-            result = result()
-        try: result = await result
-        except: pass
+        if not code:
+            return None
+        
+        orj = code.strip()
+        src  = 'from common import *\n'
+        src += 'async def doit():\n'
+        src += '\timport app\n'
+        src += '\timport config as cfg\n'
+        src += '\tdev = shared.dev\n'
+        for line in orj.splitlines():
+            src += f'\t{line}\n'
+        # örnek: _exec = "dev.lcd.write('abc', 1, 1)"
+        
+        print('[DEBUG] - execCode')
+        for line in src.splitlines():
+            print(line)
+        
+        ns = {}
+        exec(src, globals(), ns)
+        if 'doit' in ns:
+            print('[DEBUG]  doit() proc found')
+            result = ns.get('doit')
+            if callable(result):
+                result = result()
+            if iscoroutine(result):
+                result = await result
+            print('[DEBUG]  doit() proc exec', f'result = {result!r}')
+        
+        ### -iptal- ###
+        # result = exec(src, globals())
+        # if callable(result):
+        #     result = result()
+        # try: result = await result
+        # except: pass
+        
         return result
     def reboot(self):
         import app

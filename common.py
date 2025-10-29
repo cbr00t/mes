@@ -269,7 +269,8 @@ def async_task(proc, *args, **kwargs):
     """Run coroutine as background task with safe exception logging."""
     async def wrapper():
         try:
-            await proc(*args, **kwargs)
+            task = asyncio.create_task(wrapper())
+            return task    # task objesi döner (await edilebilir)
         except Exception as ex:
             print(f"[ERROR in {proc.__name__}]", ex)
             try:
