@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 16)
+    version                         = (1, 1, 17)
 )
 
 
@@ -85,7 +85,15 @@ hw = NS(
          # freq = 400_000
     ),
     led = NS(count = 1, pin = 22, brightness = 5_000),
-    buzzer = NS(pin = 21, freq = 440, duration = 0.15, pause = 0.1)
+    buzzer = NS(pin = 21, freq = 440, duration = 0.15, pause = 0.1),
+    plc = NS(
+        scan_interval_ms         = 100,       # voltaj tarama sıklığı
+        simulation_interval_ms   = 5_000,     # simulasyon zamanı (ms)
+        pin                      = 28,        # GP28 = ADC2
+        VREF                     = 3.3,       # ADC referansı (tipik 3.3 V)
+        THRESHOLD_V              = 2.9,       # Eşik
+        PERIOD_MS                = 300,       # 0.3 sn'de bir ölç
+    )
 )
 
 

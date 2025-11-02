@@ -24,6 +24,7 @@ class BaseRFID:
             l = self.state.last
             l[0] = rfid
             l[1] = ts
+            print(f'[DEBUG]  rfid: {rfid} | last: {l}')
             rec = (
                 # key, rfid, duration, ts, tsDiff, released
                 'kart', rfid, None, ts, None, None
@@ -34,9 +35,9 @@ class BaseRFID:
                 buzzer.beep(2500, .2)
             return True
         except MemoryError as ex:
-            print("RFID tarama hatası:", ex)
+            print(f"[ERROR]  RFID tarama hatası:", ex)
         except Exception as ex:
-            print("RFID tarama hatası:", ex)
+            print(f"[ERROR]  RFID tarama hatası:", ex)
             print_exception(ex)
         return False 
     def read(self):

@@ -7,14 +7,14 @@ from app_menus import *
 
 async def init():
     global aborted, localIP, srvIP, srvPort, dev, wifi, ws
-    global lcd, led, keypad, rfid, buzzer, h
+    global h, lcd, led, keypad, rfid, buzzer, plc
     localIP = ip2Str(local.ip); srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
     print(f'localIP: [{localIP}] | server rawwset: [{srvIP}:{srvPort}]')
     aborted = False
     dev = initDevice(); h = initHandlers()
     wifi = dev.wifi; lcd = dev.lcd; led = dev.led;
     ws = dev.ws; keypad = dev.keypad;
-    rfid = dev.rfid; buzzer = dev.buzzer
+    rfid = dev.rfid; buzzer = dev.buzzer; plc = dev.plc
     shared._onKeyPressed = onKeyPressed
     shared._onKeyReleased = onKeyReleased
     
@@ -35,13 +35,11 @@ async def run():
     if ws.isConnected():
         ws.close()
     
-    async def init_core1():
-        await asleep(10)
-        gc.collect()
-        thread(threadProc)
-        led.write('CYAN')
+    await asleep(10)
+    gc.collect()
+    thread(threadProc)
+    led.write('CYAN')
     
-    async_task(init_core1)
     while not aborted:
         try:
             await loop()
@@ -58,15 +56,20 @@ async def run():
 
 def threadProc():
     global aborted
+    print("\n[core1] thread started")
     global_wait = local.threadLoop_globalWait_ms
     wait_keypad = hw.keypad.scan_interval_ms
     wait_rfid = hw.rfid.scan_interval_ms
+    wait_plc = hw.plc.scan_interval_ms
     if isLocalPy():
         if wait_keypad:
             wait_keypad += hw.keypad.simulation_interval_ms
         if wait_rfid:
             wait_rfid += hw.rfid.simulation_interval_ms
-    _now = ticks_ms(); lastTS_keypad = _now; lastTS_rfid = _now
+        if wait_plc:
+            wait_plc += hw.plc.simulation_interval_ms
+    _now = ticks_ms(); lastTS_keypad = _now
+    lastTS_rfid = _now; lastTS_plc = _now
     gc.collect()
     while not aborted:
         katsayi = 5 if isIdle() else 1
@@ -74,13 +77,20 @@ def threadProc():
         try:
             if keypad is not None and wait_keypad and \
                     ticks_diff(ticks_ms(), lastTS_keypad) >= (wait_keypad * katsayi):
+                # print('[DEBUG]  in thread loop')
                 try: keypad.update()
                 finally: lastTS_keypad = ticks_ms()
             # print(f'[core1]  keypad_trigger_diff: [{ticks_diff(ticks_ms(), lastTS_keypad)}]')
             if rfid is not None and wait_rfid and \
                     ticks_diff(ticks_ms(), lastTS_rfid) >= (wait_rfid * katsayi):
+                # print('[DEBUG]  in thread loop')
                 try: rfid.update()
                 finally: lastTS_rfid = ticks_ms()
+            if plc is not None and wait_plc and \
+                    ticks_diff(ticks_ms(), lastTS_plc) >= (wait_plc * katsayi):
+                # print('[DEBUG]  in thread loop')
+                try: plc.update()
+                finally: lastTS_plc = ticks_ms()
         except KeyboardInterrupt as ex:
             aborted = True
             print("\n[core1] stopped by user (KeyboardInterrupt)")
@@ -88,7 +98,7 @@ def threadProc():
         except Exception as ex:
             print('[ERROR]', ex)
             print_exception(ex)
-    print("\n[core1] stopped by abort signal")
+    print("\n[core1] thread stopped by abort signal")
 
 async def loop():
     waitMS = 200
@@ -260,7 +270,7 @@ async def wsCheckStatusIfNeed():
             }
         if rec:
             rec = rec[0] if isinstance(rec, list) else rec
-            if rec.get('isError') and bool(rec.get('isError')):
+            if isinstance(rec, dict) and rec.get('isError') and bool(rec.get('isError')):
                 code = rec.get('code') or rec.get('rc')
                 errorText = 'IP-CIHAZ TANIMI YOK' if code == 'invalidMachine' \
                             else rec.get('errorText')
@@ -423,7 +433,7 @@ async def onKeyPressed_defaultAction(rec):
         try:
             if not ws.isConnected():
                 return False
-            args = { 'id': _id, 'duration': None, 'ts': ts, 'tsDiff': tsDiff, 'released': False }
+            args = { 'id': _id, 'kartNo': rfid, 'duration': None, 'ts': ts, 'tsDiff': tsDiff, 'released': False }
             if not await ws.wsSend('fnIslemi', args=args):
                 raise RuntimeError()
             buzzer.beep(4500, .05)
@@ -447,7 +457,7 @@ async def onKeyPressed_defaultAction(rec):
             await wsCheckStatusIfNeed()
     return True
 async def onKeyReleased_defaultAction(rec):
-    key, _, duration = rec
+    key, rfid, duration, ts, tsDiff, _ = rec
     print(f'{key} released | duration = {duration}')
     key = key.lower();
     if key == 'esc' and duration >= 2:

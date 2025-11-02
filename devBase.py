@@ -9,3 +9,4 @@ from devBase_lcd import *
 from devBase_led import *
 from devBase_rfid import *
 from devBase_buzzer import *
+from devBase_plc import *

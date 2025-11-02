@@ -3,7 +3,7 @@ from common import *
 from config import local, server as srv, hw
 from devBase import *
 if isMicroPy():
-    from machine import Pin, I2C, PWM
+    from machine import Pin, I2C, PWM, ADC
     from network import WLAN, STA_IF
     import rp2
     from pico_i2c_lcd import I2cLcd
@@ -283,7 +283,7 @@ class RFID(BaseRFID):
         super().__init__()
         s = self.state
         s.iterAfterLastGC = 0
-        reader = self.reader = MFRC522(spi_id=0,sck=2,miso=4,mosi=3,cs=1,rst=0) if isMicroPy() else None
+        reader = self.reader = MFRC522(spi_id=0, sck=2, miso=4, mosi=3, cs=1, rst=0) if isMicroPy() else None
         if reader is not None:
             reader.init()
     def read(self):
@@ -323,12 +323,11 @@ class RFID(BaseRFID):
         if stat != reader.OK:
             self.reset()
             return None        
-        print('debug6')
-        if (isLocalPy()):
-            print('Card detected: ', uid2Str(uid))                              # DEBUG
+        # print('debug6')
+        print('[DEBUG]  Card detected: ', uid2Str(uid))                              # DEBUG
         if reader.IsNTAG():
+            print(f'[DEBUG]  Got NTAG: ', reader.NTAG)                               # DEBUG
             if (isLocalPy()):
-                print(f'Got NTAG: ', reader.NTAG)                               # DEBUG
                 reader.MFRC522_Dump_NTAG(Start=0, End=reader.NTAG_MaxPage)      # DEBUG
             #print("Write Page 5  to 0x1,0x2,0x3,0x4  in 2 second")
             #utime.sleep(2)
@@ -338,11 +337,13 @@ class RFID(BaseRFID):
         else:
             (stat, tag_type) = reader.request(reader.REQIDL)
             if stat != reader.OK:
+                print(f'[DEBUG]  CARD NOT OK: ', reader.NTAG)
                 self.reset()
                 return None
             (stat, uid2) = reader.SelectTagSN()
-            if not (stat == reader.OK and uid == uid2):
-                return None
+            print(f'[DEBUG]  ', stat, uid2)
+            # if not (stat == reader.OK and uid == uid2):
+            #     return None
             # defaultKey = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
             if isLocalPy():
                 reader.MFRC522_DumpClassic1K(uid, Start=0, End=64, keyA=self._defaultKey)
@@ -354,6 +355,19 @@ class Buzzer(BaseBuzzer):
         super().__init__()
         c = hw.buzzer
         self.buzzer = PWM(Pin(c.pin)) if 'PWM' in globals() else None
+
+class PLC(BasePLC):
+    def __init__(self):
+        super().__init__()
+        c = hw.plc
+        self.adc = ADC(Pin(c.pin)) if 'ADC' in globals() else None
+    def read(self):
+        s = self.state; c = hw.plc; adc = self.adc
+        raw = adc.read_u16()              # 0..65535 (12-bit ADC ölçekli)
+        state = raw * c.VREF / 65535.0
+        isBitti = state < c.THRESHOLD_V
+        # print(f'[DEBUG]  [ raw = {raw} | state = {state} | isVar = {isVar} ]')
+        return isBitti
 
 # ---------- Device Initialization ----------
 shared.updateCheck = True
@@ -368,9 +382,11 @@ def setup_lcd():    dev.lcd    = LCD()
 def setup_led():    dev.led    = LED()
 def setup_rfid():   dev.rfid   = RFID()
 def setup_buzzer(): dev.buzzer = Buzzer()
+def setup_plc():    dev.plc    = PLC()
 
 for step in [
     setup_wifi, setup_ws, setup_keypad,
-    setup_lcd, setup_led, setup_rfid, setup_buzzer
+    setup_lcd, setup_led, setup_rfid,
+    setup_buzzer, setup_plc
 ]:
     step()

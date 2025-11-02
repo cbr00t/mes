@@ -159,6 +159,21 @@ class RFID(BaseRFID):
         l[1] = ticks_ms()
         return uid2Str(uid)
 
+class PLC(BasePLC):
+    def __init__(self):
+        super().__init__()
+        print('! plc init')
+    def update(self):
+        simulation_interval_ms = hw.plc.simulation_interval_ms
+        if not simulation_interval_ms:
+            return False
+        return super().update()
+    def read(self):
+        super().read()
+        s = self.state; l = s.last
+        isVar = not l[0]
+        return isVar
+
 
 # ---------- Device Initialization ----------
 shared.updateCheck = False                                     # if config.autoUpdate is None
@@ -172,9 +187,11 @@ def setup_lcd():    dev.lcd    = LCD()
 def setup_led():    dev.led    = LED()
 def setup_rfid():   dev.rfid   = RFID()
 def setup_buzzer(): dev.buzzer = BaseBuzzer()
+def setup_plc():    dev.plc    = PLC()
 steps = [
     setup_wifi, setup_req, setup_ws, setup_keypad,
-    setup_lcd, setup_led, setup_rfid, setup_buzzer
+    setup_lcd, setup_led, setup_rfid,
+    setup_buzzer, setup_plc
 ]
 for step in steps:
     step()
