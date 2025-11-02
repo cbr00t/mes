@@ -186,7 +186,8 @@ async def connectToServerIfNot():
         lastTime.srvConnectMsg = ticks_ms()
     try:
         result = await ws.open()
-        await ws.recv(timeout=.1)
+        for i in range(5):
+            await ws.recv(timeout=.1)
         await ws.wsTalk('ping')
         shared._appReady = True
         led.write('MAVI')
@@ -251,18 +252,19 @@ async def wsCheckStatusIfNeed():
     if not ws.isConnected(): return False
     if not statusShouldBeChecked(): return False
     try:
-        await ws.recv(.001)
+        for i in range(5):
+            await ws.recv(.1)
         rec = None
-        try:
-            for i in range(0, 5):
-                rec = await ws.wsTalk(api='tezgahBilgi', timeout=.5)
+        for i in range(5):
+            try:
+                rec = await ws.wsTalk(api='tezgahBilgi', timeout=.3)
                 if rec:
                     break
                 else:
-                    await asleep_ms(10)
-        except Exception as ex:
-            print(ex)
-            print_exception(ex)
+                    await asleep_ms(10 * (i + 1))
+            except Exception as ex:
+                print(ex)
+                print_exception(ex)
         if not rec:
             rec = {
                 'urunKod': 'MAKINE TANIMI VEYA', 'perKod': 'BEKLEYEN IS YOK',
