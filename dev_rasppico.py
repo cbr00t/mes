@@ -336,15 +336,12 @@ class RFID(BaseRFID):
             #reader.MFRC522_Dump_NTAG(Start=5,End=6)
         else:
             (stat, tag_type) = reader.request(reader.REQIDL)
-            if stat != reader.OK:
-                print(f'[DEBUG]  CARD NOT OK: ', reader.NTAG)
-                self.reset()
-                return None
+            # if stat != reader.OK:
+            #    print(f'[DEBUG]  CARD NOT OK: ', reader.NTAG)
+            #    self.reset()
+            #    return None
             (stat, uid2) = reader.SelectTagSN()
             print(f'[DEBUG]  ', stat, uid2)
-            # if not (stat == reader.OK and uid == uid2):
-            #     return None
-            # defaultKey = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
             if isLocalPy():
                 reader.MFRC522_DumpClassic1K(uid, Start=0, End=64, keyA=self._defaultKey)
         l[0] = uid
@@ -360,12 +357,19 @@ class PLC(BasePLC):
     def __init__(self):
         super().__init__()
         c = hw.plc
-        self.adc = ADC(Pin(c.pin)) if 'ADC' in globals() else None
+        if c.kuru_kontak:
+            pass
+        else:
+            self.adc = ADC(Pin(c.pin)) if 'ADC' in globals() else None
     def read(self):
-        s = self.state; c = hw.plc; adc = self.adc
-        raw = adc.read_u16()              # 0..65535 (12-bit ADC ölçekli)
-        state = raw * c.VREF / 65535.0
-        isBitti = state < c.THRESHOLD_V
+        s = self.state; c = hw.plc
+        if c.kuru_kontak:
+            isBitti = False
+        else:
+            adc = self.adc
+            raw = adc.read_u16()              # 0..65535 (12-bit ADC ölçekli)
+            state = raw * c.VREF / 65535.0
+            isBitti = state < c.THRESHOLD_V
         # print(f'[DEBUG]  [ raw = {raw} | state = {state} | isVar = {isVar} ]')
         return isBitti
 

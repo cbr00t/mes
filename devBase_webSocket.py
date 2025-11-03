@@ -36,6 +36,7 @@ class BaseWebSocket:
         except Exception as ex:
             print("[ERROR] ws open:", ex)
             print_exception(ex)
+            await asleep(.5)
             # if lcd:
             #     lcd.writeStatus('!')
             await self.close()

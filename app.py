@@ -19,6 +19,7 @@ async def init():
     shared._onKeyReleased = onKeyReleased
     
 async def run():
+    from config import app
     global aborted
     lcd.off().on(); lcd.clearIfReady()
     
@@ -35,8 +36,10 @@ async def run():
     if ws.isConnected():
         ws.close()
     
-    await asleep(10)
+    await asleep(.1)
+    lcd.writeIfReady(f'{app.name} v{version2Str(app.version)}', 0, 0)
     gc.collect()
+    
     thread(threadProc)
     led.write('CYAN')
     
@@ -104,7 +107,6 @@ async def loop():
     waitMS = 200
     if isIdle():
         waitMS *= 5
-    await asleep_ms(waitMS)
     await processQueues()
     if not (await wifiCheck() and await connectToServerIfNot()):
         return
@@ -119,6 +121,7 @@ async def loop():
         # rfid.update(); keypad.update()
     if not lcdIsBusy():
         await processQueues()
+    await asleep_ms(waitMS)
 
 def initDevice():
     print('    init device')
@@ -210,7 +213,7 @@ async def updateMainScreen():
     rec = rec and rec[0] if isinstance(rec, list) else rec if isinstance(rec, dict) else {}
     _rec = {k: v for k, v in rec.items() if 'Sure' not in k}
     def str_val(key):
-        return rec.get(key) or ''
+        return rec.get(key) or ' '
     def int_val(key):
         value = rec.get(key) or 0
         return int(value) if isinstance(value, (str, int, float)) else 0
@@ -293,7 +296,11 @@ async def wsCheckStatusIfNeed():
                 await updateDurumLED(durumKod)
             shared.lastTime.statusCheck = ticks_ms()            
             if _exec:
-                _exec = json.loads(_exec) if isinstance(_exec, str) else _exec
+                if isinstance(_exec, str):
+                    try: _exec = json.loads(_exec)
+                    except Exception as ex:
+                        print(f'[ERROR]  {ex} | {_exec}')
+                        print_exception(ex)
                 actions = None
                 if not isinstance(_exec, list):
                     actions = _exec if _exec and isinstance(_exec, dict) and not bool(_exec.get('isError')) else None
@@ -421,7 +428,8 @@ async def onKeyPressed_defaultAction(rec):
     key, rfid, duration, ts, tsDiff, _ = rec
     key = key.lower(); appReady = shared._appReady
     print(f'{key} press', f' [appReady={appReady}]')
-    lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 8)
+    lcd.writeIfReady('           ', lcd.getRows() - 1, lcd.getCols() - 11)
+    lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 11)
     if key == 'f1':
         DeviceInfoPart().run()
     elif appReady and key == 'f2':
@@ -466,3 +474,8 @@ async def onKeyReleased_defaultAction(rec):
         from app import reboot
         reboot()
     return True
+
+
+try: from app_ek import *
+except: pass
+

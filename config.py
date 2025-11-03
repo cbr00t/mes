@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 18)
+    version                         = (1, 1, 19)
 )
 
 
@@ -39,7 +39,7 @@ server = NS(
 )
 
 wifi = NS(
-    # ssid                            = 'SKYMES',
+    # ssid                          = 'SKYMES',
     ssid                            = '',
     passwd                          = '00000000',
     timeout                         = 15
@@ -87,6 +87,7 @@ hw = NS(
     led = NS(count = 1, pin = 22, brightness = 5_000),
     buzzer = NS(pin = 21, freq = 440, duration = 0.15, pause = 0.1),
     plc = NS(
+        kuru_kontak              = False,     # Voltaj / Kuru Kontak
         scan_interval_ms         = 100,       # voltaj tarama sıklığı
         simulation_interval_ms   = 5_000,     # simulasyon zamanı (ms)
         pin                      = 28,        # GP28 = ADC2
@@ -103,5 +104,6 @@ hw = NS(
 
 from config_override import *
 
-
+try: from config_ek import *
+except: pass
 
