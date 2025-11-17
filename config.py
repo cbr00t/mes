@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 19)
+    version                         = (1, 1, 20)
 )
 
 

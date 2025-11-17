@@ -9,8 +9,8 @@ from config import local, server, wifi
 
 ## Ana Makine (Server) Ayarları
 ## --------------------------------
-server.ip                           =  (192, 168, 10, 253)
-updatePorts                         =  [2085]
+server.ip                           =  (192, 168, 10, 251)
+updatePorts                         =  [80]
 
 
 ## Cihaz Ayarları
