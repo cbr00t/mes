@@ -21,4 +21,3 @@ wifi.ssid                           =  'Uysal'
 wifi.passwd                         =  'Lasyu123Uysal'
 # wifi.ssid                         =  'Keenetic-2432'
 # wifi.passwd                       =  'iAQTYhK9'
-

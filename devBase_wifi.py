@@ -53,9 +53,9 @@ class BaseWiFi:
                     local.gateway = str2IP(_c[2])
                     local.dns = str2IP(_c[3])
         return True
-    def disconnect(self, ssid, passwd):
+    def disconnect(self):
         wlan = self.wlan
-        return wlan.disconnect(ssid, passwd)
+        return wlan.disconnect()
     def autoConnect(self, passwd=None, timeout=None):
         wlan = self.wlan
         if not wlan:

@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 20)
+    version                         = (1, 1, 21)
 )
 
 
@@ -34,8 +34,8 @@ server = NS(
     wsPath                          =  'ws/skyMES/makineDurum',
     autoUpdate                      =  True,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
-    statusCheckInterval             =  1.5,                                # sn
-    socketTimeout                   =  0.5                                 # sn
+    statusCheckInterval             =  3.0,                                # sn
+    socketTimeout                   =  1.0                                 # sn
 )
 
 wifi = NS(
@@ -71,11 +71,11 @@ hw = NS(
         ],
         debounce_ms = 1,
         scan_interval_ms = 1,
-        simulation_interval_ms = 5_000
+        simulation_interval_ms = 0
     ),
     rfid = NS(
         scan_interval_ms = 100,
-        simulation_interval_ms = 25_000
+        simulation_interval_ms = 0
     ),
     lcd = NS(
         rows = int(4), cols = int(20),
@@ -89,7 +89,7 @@ hw = NS(
     plc = NS(
         kuru_kontak              = False,     # Voltaj / Kuru Kontak
         scan_interval_ms         = 100,       # voltaj tarama sıklığı
-        simulation_interval_ms   = 5_000,     # simulasyon zamanı (ms)
+        simulation_interval_ms   = 0,         # simulasyon zamanı (ms)
         pin                      = 28,        # GP28 = ADC2
         VREF                     = 3.3,       # ADC referansı (tipik 3.3 V)
         THRESHOLD_V              = 2.9,       # Eşik

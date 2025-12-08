@@ -15,6 +15,9 @@ class BaseWebSocket:
         self.ws = None
         self._lastSend = None
         self._lastRecv = None
+        self._protocolErr_maxTry = 30
+        self._protocolErr_maxTry_critical = self._protocolErr_maxTry * 3
+        self._protocolErr_count = 0
     # ---- lifecycle ---------------------------------------------------------
     def isConnected(self):
         return self.ws is not None
@@ -127,6 +130,7 @@ class BaseWebSocket:
             await asleep_ms(1)
             # if lcd and restoreIndicator:
             #     lcd.writeStatus('*')
+            gc.collect()
             return text
         # except asyncio.TimeoutError:
         #     print('[WARN] ws recv timeout')
@@ -134,7 +138,34 @@ class BaseWebSocket:
         except Exception as ex:
             msg = ex.args[0] if ex.args and ex.args[0] else str(ex)
             if ex.__class__.__name__.lower() in ('timeouterror', 'timeout'):
+                gc.collect()
                 await asleep(.1)
+            elif ex.__class__.__name__.lower() in ('notimplementederror'):
+                print(f'[ERROR] ws recv (protocol): {msg} | errCount = {self._protocolErr_count} | maxTry = {self._protocolErr_maxTry}')
+                print_exception(ex)
+                self._protocolErr_count = (self._protocolErr_count or 0) + 1
+                gc.collect()
+                await asleep(.3)
+                if self._protocolErr_maxTry and self._protocolErr_count > self._protocolErr_maxTry:
+                    # websocket kapat
+                    print(f'[DEBUG]  ws close')
+                    self.close()
+                    # wifi disconnect
+                    wifi = shared.dev.wifi
+                    if wifi and wifi.isConnected():
+                        print(f'[DEBUG]  wifi disconnect')
+                        wifi.disconnect()
+                    if self._protocolErr_maxTry_critical:
+                        if self._protocolErr_count > self._protocolErr_maxTry_critical:
+                            self._protocolErr_count = 0
+                            # gerekirse cihaz reboot
+                            try:
+                               from app import reboot
+                               reboot()
+                            except:
+                               pass
+                    else:
+                        self._protocolErr_count = 0
             else:
                 if lcd:
                     lcd.writeStatus('!')

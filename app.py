@@ -152,7 +152,8 @@ def reboot():
     print('rebooting...')
     lcd.write('REBOOTING...    ', 3, 2)
     sleep_ms(50)
-    if isMicroPy(): machine.reset()
+    if isMicroPy():
+        machine.reset()
 
 async def wifiWait():
     while not wifiCheck():
@@ -252,28 +253,40 @@ def renderAppTitle():
     shared._appTitleRendered = True
 
 async def wsCheckStatusIfNeed():
-    if not ws.isConnected(): return False
-    if not statusShouldBeChecked(): return False
+    gc.collect()
+    if not ws.isConnected():
+        return False
+    if not statusShouldBeChecked():
+        return False
+    
+    MaxTry = 10
+    _checkStatus = shared._checkStatus = shared._checkStatus or NS(tryCount=0)
     try:
+        if (_checkStatus.tryCount or 0) > MaxTry:
+            _checkStatus.tryCount = 0
+        _checkStatus.tryCount = (_checkStatus.tryCount or 0) + 1
         for i in range(5):
-            await ws.recv(.1)
+            await ws.recv(.05)
         rec = None
         for i in range(5):
             try:
-                rec = await ws.wsTalk(api='tezgahBilgi', timeout=.3)
+                rec = await ws.wsTalk(api='tezgahBilgi', timeout=.1)
                 if rec:
                     break
                 else:
-                    await asleep_ms(10 * (i + 1))
+                    await asleep_ms(5 * (i + 1))
             except Exception as ex:
                 print(ex)
                 print_exception(ex)
-        if not rec:
+        print(f'[DEBUG]  (tryCount = {_checkStatus.tryCount} | MaxTry = {MaxTry})')
+        if not rec and _checkStatus.tryCount >= MaxTry:
             rec = {
                 'urunKod': 'MAKINE TANIMI VEYA', 'perKod': 'BEKLEYEN IS YOK',
                 'durumKod': '', 'ledDurum': 'ROSE', '_exec': None
             }
         if rec:
+            # sunucudan geçerli cevap geldi, deneme sayısını sıfırla
+            _checkStatus.tryCount = 0
             rec = rec[0] if isinstance(rec, list) else rec
             if isinstance(rec, dict) and rec.get('isError') and bool(rec.get('isError')):
                 code = rec.get('code') or rec.get('rc')
@@ -299,8 +312,10 @@ async def wsCheckStatusIfNeed():
                 if isinstance(_exec, str):
                     try: _exec = json.loads(_exec)
                     except Exception as ex:
-                        print(f'[ERROR]  {ex} | {_exec}')
-                        print_exception(ex)
+                        print(f'[ERROR] (ignored)  {ex} | {_exec}')
+                        if _exec:
+                            _exec = { 'actions': [{ 'action': 'exec', 'args': [_exec] }] }
+                        # print_exception(ex)
                 actions = None
                 if not isinstance(_exec, list):
                     actions = _exec if _exec and isinstance(_exec, dict) and not bool(_exec.get('isError')) else None
@@ -427,9 +442,13 @@ async def onKeyReleased(rec):
 async def onKeyPressed_defaultAction(rec):
     key, rfid, duration, ts, tsDiff, _ = rec
     key = key.lower(); appReady = shared._appReady
-    print(f'{key} press', f' [appReady={appReady}]')
+    print(f'{key} press', f' [rfid = {rfid} | appReady={appReady}]')
     lcd.writeIfReady('           ', lcd.getRows() - 1, lcd.getCols() - 11)
     lcd.writeIfReady(f'[{key}]', lcd.getRows() - 1, lcd.getCols() - 11)
+    if rfid:
+        lcd.writeLineIfReady(f'[{rfid}]', lcd.getRows() - 2, 2)
+        # ekran goruntusu sonraki loop'da yenilensin
+        shared._updateMainScreen_lastHashStr = shared._updateMainScreen_lastUrunKod = shared._updateMainScreen_lastPerKod = None
     if key == 'f1':
         DeviceInfoPart().run()
     elif appReady and key == 'f2':
@@ -471,7 +490,7 @@ async def onKeyReleased_defaultAction(rec):
     print(f'{key} released | duration = {duration}')
     key = key.lower();
     if key == 'esc' and duration >= 2:
-        from app import reboot
+        # from app import reboot
         reboot()
     return True
 
