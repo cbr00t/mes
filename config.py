@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 23)
+    version                         = (1, 1, 24)
 )
 
 
@@ -24,7 +24,9 @@ local = NS(
     idleTime                        =  30 * 60,                           # sn
     threadLoop_globalWait_ms        =  5,
     rebootTime                      =  0,                                 # dk
-    rebootWaitIdle                  =  True
+    rebootWaitIdle                  =  True,
+    gcLoopCount                     =  100,
+    gcFreeBytesLimit                =  8_000
 )
 
 ## Ana Makine (Server) Ayarları

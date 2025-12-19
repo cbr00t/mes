@@ -127,6 +127,8 @@ async def loop():
     if not lcdIsBusy():
         await processQueues()
     await asleep_ms(waitMS)
+    if not checkGC():
+        return False    # break loop
     if checkReboot():
         return False    # break loop
     return True
@@ -185,7 +187,8 @@ async def connectToServerIfNot():
         lastTime.srvConnectMsg = None
         return True
     shared._appTitleRendered = False
-    lastTime.updateMainScreen = shared._updateMainScreen_lastDebugText = None
+    lastTime.updateMainScreen = shared._updateMainScreen_lastHashStr = shared._updateMainScreen_lastDebugText = None
+    shared._updateMainScreen_lastUrunKod = shared._updateMainScreen_lastPerKod = None
     if not await wifiCheck():
         shared._appReady = False
         lcd.writeStatus('x', -1)
@@ -193,8 +196,8 @@ async def connectToServerIfNot():
     shared._inActionsCheck = False; lastTime = shared.lastTime
     srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
     if not lcdIsBusy() and (not lastTime.srvConnectMsg or ticks_diff(ticks_ms(), lastTime.srvConnectMsg) >= 5_000):
-        lcd.writeLineIfReady('SUNUCUYA BAGLAN:', 1, 0)
-        lcd.writeLineIfReady(f'{srvIP}:{srvPort}', 2, 1)
+        lcd.writeLine('SUNUCUYA BAGLAN:', 1, 0)
+        lcd.writeLine(f'{srvIP}:{srvPort}', 2, 1)
         lastTime.srvConnectMsg = ticks_ms()
     try:
         result = await ws.open()
@@ -203,6 +206,9 @@ async def connectToServerIfNot():
         await ws.wsTalk('ping')
         shared._appReady = True
         led.write('MAVI')
+        if not lcdIsBusy():
+            lcd.clearLine(1)
+            lcd.clearLine(2)
         return result
     except Exception as ex:
         print('[ERROR]', ex); print_exception(ex)
@@ -502,14 +508,31 @@ async def onKeyReleased_defaultAction(rec):
         reboot()
     return True
 
+def checkGC():
+    gcLoopCount = local.gcLoopCount
+    freeBytesLimit = local.gcFreeBytesLimit
+    freeBytes = gc.mem_free()
+    shouldGC = gcLoopCount and loopCount % (gcLoopCount + 1) == gcLoopCount
+    if not shouldGC and freeBytesLimit and freeBytes < freeBytesLimit:
+        shouldGC = True
+    if shouldGC:
+        print(f'[DEBUG]  gc.collect(): free memory - freeBytes: [{freeBytes}] | gcFreeBytesLimit: [{freeBytesLimit}]')
+        gc.collect()
+    freeBytes = gc.mem_free()
+    if freeBytesLimit and freeBytes < freeBytesLimit:
+        print(f'[DEBUG]  gc.collect(): LOW MEMORY - reboot requested  freeBytes: [{freeBytes}] | gcFreeBytesLimit: [{freeBytesLimit}]')
+        reboot()
+        return False    # break loop
+    return True
 def checkReboot():
     global loopCount
-    rebootTimeMS = (local.rebootTime or 0) * 60_000
+    rebootTimeMS = local.rebootTime or 0
+    rebootTimeMS *= 60_000
     _uptime = uptime()
     _busy = isBusy()
     _debugPrintIterCount = 10
     if _debugPrintIterCount and loopCount % (_debugPrintIterCount + 1) == _debugPrintIterCount:
-        print(f'[DEBUG]  up time: [{_uptime}] | busy: [{_busy}] | [rebootTimeMins: [{local.rebootTime}]')
+        print(f'[DEBUG]  up time: [{_uptime}] | busy: [{_busy}] | rebootTimeMins: [{local.rebootTime}]')
         print('\n')
     if rebootTimeMS <= 0 or _uptime < rebootTimeMS:
         return False
