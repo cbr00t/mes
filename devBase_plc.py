@@ -16,6 +16,7 @@ class BasePLC:
             isBitti = self.read()
             if isBitti != l[0]:
                 print(f'[DEBUG]  plc  [ isBitti: {isBitti} | last: {l} ]')
+                busy()
                 ts = ticks_ms()
                 tsDiff = ticks_diff(ts, l[1]) if l[1] else None
                 if isBitti:

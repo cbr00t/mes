@@ -17,10 +17,13 @@ async def init():
     rfid = dev.rfid; buzzer = dev.buzzer; plc = dev.plc
     shared._onKeyPressed = onKeyPressed
     shared._onKeyReleased = onKeyReleased
+    shared.startTime = ticks_ms()
+    print(f'start time: [{shared.startTime}]')
     
 async def run():
     from config import app
-    global aborted
+    global aborted, loopCount
+    loopCount = 0
     lcd.off().on(); lcd.clearIfReady()
     
     led.write('SIYAH')
@@ -45,7 +48,9 @@ async def run():
     
     while not aborted:
         try:
-            await loop()
+            loopCount += 1
+            if not await loop():
+                break
         except KeyboardInterrupt as ex:
             aborted = True
             print("\n[core0] stopped by user (KeyboardInterrupt)")
@@ -106,7 +111,7 @@ def threadProc():
 async def loop():
     waitMS = 200
     if isIdle():
-        waitMS *= 5
+        waitMS *= 3
     await processQueues()
     if not (await wifiCheck() and await connectToServerIfNot()):
         return
@@ -122,6 +127,9 @@ async def loop():
     if not lcdIsBusy():
         await processQueues()
     await asleep_ms(waitMS)
+    if checkReboot():
+        return False    # break loop
+    return True
 
 def initDevice():
     print('    init device')
@@ -494,6 +502,21 @@ async def onKeyReleased_defaultAction(rec):
         reboot()
     return True
 
+def checkReboot():
+    global loopCount
+    rebootTimeMS = (local.rebootTime or 0) * 60_000
+    _uptime = uptime()
+    _busy = isBusy()
+    _debugPrintIterCount = 10
+    if _debugPrintIterCount and loopCount % (_debugPrintIterCount + 1) == _debugPrintIterCount:
+        print(f'[DEBUG]  up time: [{_uptime}] | busy: [{_busy}] | [rebootTimeMins: [{local.rebootTime}]')
+        print('\n')
+    if rebootTimeMS <= 0 or _uptime < rebootTimeMS:
+        return False
+    if local.rebootWaitIdle == True and _busy:
+        return False
+    reboot()
+    return True
 
 try: from app_ek import *
 except: pass

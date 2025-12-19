@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 21)
+    version                         = (1, 1, 23)
 )
 
 
@@ -22,7 +22,9 @@ local = NS(
     subnet                          =  (255, 255, 255, 0),
     dns                             =  (1, 1, 1, 1),
     idleTime                        =  30 * 60,                           # sn
-    threadLoop_globalWait_ms        =  5
+    threadLoop_globalWait_ms        =  5,
+    rebootTime                      =  0,                                 # dk
+    rebootWaitIdle                  =  True
 )
 
 ## Ana Makine (Server) Ayarları

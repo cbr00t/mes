@@ -3,6 +3,7 @@ from common import *
 async def main():
     import app
     await app.init()
+    # app.checkReboot()
     await app.run()
     
     # print(uid2Str([11,22,33,44]))

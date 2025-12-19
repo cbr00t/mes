@@ -128,6 +128,7 @@ class BaseWebSocket:
                 return None
             self._lastRecv = ticks_ms()
             await asleep_ms(1)
+            gc.collect()
             # if lcd and restoreIndicator:
             #     lcd.writeStatus('*')
             gc.collect()
@@ -140,11 +141,10 @@ class BaseWebSocket:
             if ex.__class__.__name__.lower() in ('timeouterror', 'timeout'):
                 gc.collect()
                 await asleep(.1)
-            elif ex.__class__.__name__.lower() in ('notimplementederror'):
+            elif ex.__class__.__name__.lower() in ('notimplementederror', 'valueerror'):
                 print(f'[ERROR] ws recv (protocol): {msg} | errCount = {self._protocolErr_count} | maxTry = {self._protocolErr_maxTry}')
                 print_exception(ex)
                 self._protocolErr_count = (self._protocolErr_count or 0) + 1
-                gc.collect()
                 await asleep(.3)
                 if self._protocolErr_maxTry and self._protocolErr_count > self._protocolErr_maxTry:
                     # websocket kapat
@@ -155,6 +155,7 @@ class BaseWebSocket:
                     if wifi and wifi.isConnected():
                         print(f'[DEBUG]  wifi disconnect')
                         wifi.disconnect()
+                        gc.collect()
                     if self._protocolErr_maxTry_critical:
                         if self._protocolErr_count > self._protocolErr_maxTry_critical:
                             self._protocolErr_count = 0

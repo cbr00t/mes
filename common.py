@@ -387,7 +387,8 @@ def statusShouldBeChecked():
     intv = getStatusCheckInterval() * 1_000
     lastMS = shared.lastTime.statusCheck or 0
     return intv and ticks_diff(ticks_ms(), lastMS) > intv
-
+def uptime():
+    return ticks_diff(ticks_ms(), shared.startTime or 0)
 
 try:
     from machine import Pin 
