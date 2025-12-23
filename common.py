@@ -314,9 +314,9 @@ def getUpdateUrls():
     ip = 'localhost'; localIP = ip2Str(local.ip) if local.ip else None
     result = []
     for port in srv.updatePorts:
-        result.append(f'http://{ip}:{port}{updateUrl_postfix}')
         if localIP:
             result.append(f'http://{ip}:{port}{updateUrl_postfix}/{localIP}')
+        result.append(f'http://{ip}:{port}{updateUrl_postfix}')
     return result
 def getWSUrlBase(https = None, ip = None, port = None):
     from config import server as srv

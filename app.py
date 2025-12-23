@@ -6,11 +6,11 @@ from app_infoPart import *
 from app_menus import *
 
 async def init():
-    global aborted, localIP, srvIP, srvPort, dev, wifi, ws
+    global aborted, threadAborted, localIP, srvIP, srvPort, dev, wifi, ws
     global h, lcd, led, keypad, rfid, buzzer, plc
     localIP = ip2Str(local.ip); srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
     print(f'localIP: [{localIP}] | server rawwset: [{srvIP}:{srvPort}]')
-    aborted = False
+    aborted = threadAborted = False
     dev = initDevice(); h = initHandlers()
     wifi = dev.wifi; lcd = dev.lcd; led = dev.led;
     ws = dev.ws; keypad = dev.keypad;
@@ -22,7 +22,7 @@ async def init():
     
 async def run():
     from config import app
-    global aborted, loopCount
+    global aborted, threadAborted, loopCount
     loopCount = 0
     lcd.off().on(); lcd.clearIfReady()
     
@@ -58,12 +58,18 @@ async def run():
         except Exception as ex:
             print('[ERROR]', 'APP LOOP:', ex)
             print_exception(ex)
+    aborted = threadAborted = True
+    try:
+        await ws.close()
+    except:
+        pass
+    gc.collect()
     led.write('TURUNCU')
+    await asleep(2)
     lcd.clear(); lcd.write('SHUTDOWN', 1,1)
-    await ws.close()
 
 def threadProc():
-    global aborted
+    global aborted, threadAborted
     print("\n[core1] thread started")
     global_wait = local.threadLoop_globalWait_ms
     wait_keypad = hw.keypad.scan_interval_ms
@@ -79,7 +85,7 @@ def threadProc():
     _now = ticks_ms(); lastTS_keypad = _now
     lastTS_rfid = _now; lastTS_plc = _now
     gc.collect()
-    while not aborted:
+    while not (aborted or threadAborted):
         katsayi = 5 if isIdle() else 1
         sleep_ms(global_wait * katsayi)
         try:
@@ -100,12 +106,13 @@ def threadProc():
                 try: plc.update()
                 finally: lastTS_plc = ticks_ms()
         except KeyboardInterrupt as ex:
-            aborted = True
+            aborted = threadAborted = True
             print("\n[core1] stopped by user (KeyboardInterrupt)")
             return
         except Exception as ex:
             print('[ERROR]', ex)
             print_exception(ex)
+    threadAborted = True
     print("\n[core1] thread stopped by abort signal")
 
 async def loop():
@@ -114,7 +121,7 @@ async def loop():
         waitMS *= 3
     await processQueues()
     if not (await wifiCheck() and await connectToServerIfNot()):
-        return
+        return True    # continue loop
     if not shared._updateCheckPerformed:
         await updateFiles()
     # rfid.update(); keypad.update()
@@ -158,12 +165,35 @@ async def updateSelf():
     await updateFiles()
     reboot()
 def reboot():
-    if isMicroPy(): import machine
+    global aborted, threadAborted, wifi, ws
+    aborted = threadAborted = True            # core1 thread de dursun
+    if isMicroPy():
+        import machine
+    gc.collect()
+    print('finalize...')
+    lcd.write('CLEANUP...      ', 3, 2)
+    try:
+        if ws.isConnected():
+            ws.close()
+    except:
+        pass
+    try:
+        if wifi.isConnected():
+            wifi.disconnect()
+    except:
+        pass
     print('rebooting...')
-    lcd.write('REBOOTING...    ', 3, 2)
+    try:
+        lcd.write('REBOOTING...    ', 3, 2)
+    except:
+        pass
     sleep_ms(50)
+    gc.collect()
     if isMicroPy():
         machine.reset()
+    while True:
+        # CPU HALT state loop
+        sleep_ms(10)
 
 async def wifiWait():
     while not wifiCheck():

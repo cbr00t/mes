@@ -32,13 +32,15 @@ async def updateFiles():
                 if not resp or 'not found' in resp.lower():
                     print('[INFO]', "'files.txt' not found, skipping...")
                     continue
-                url = _url; lastError = None
+                url = _url
+                lastError = None
                 break
             except Exception as ex:
                 lastError = ex; print(f'[ERROR]', ex)
                 continue
         if lastError:
-            print('[ERROR]', lastError); print_exception(lastError)
+            print('[ERROR]', lastError)
+            print_exception(lastError)
         if lastError or not url:
             return False
         for name in resp.splitlines():
@@ -46,7 +48,8 @@ async def updateFiles():
             if not name:
                 continue
             try:
-                busy(); fileUrl = f'{url}/{name}'
+                busy()
+                fileUrl = f'{url}/{name}'
                 if not lcdIsBusy():
                     lcd.write('UPDATING:      ', 1, 1)
                     lcd.writeLine(name, 2, 3)
