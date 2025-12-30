@@ -20,4 +20,4 @@ local.gateway                       =  (192, 168, 1, 1)
 wifi.ssid                           =  'Uysal'
 wifi.passwd                         =  'Lasyu123Uysal'
 
-local.rebootTime                    =  30                                   # dk
+local.rebootTime                    =  15                                   # dk

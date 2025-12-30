@@ -97,6 +97,7 @@ class Shared(NS):
         return super().getInstVars() + ['dev', 'activePart', '_inCritical']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.aborted = False
         self.updateCheck = True
         self.lastTime = NS()
         self._globals = NS()
@@ -305,6 +306,48 @@ class Device(NS):
     @classmethod
     def getInstVars(cls):
         return super().getInstVars() + ['eth', 'req', 'sock', 'keypad', 'lcd', 'led', 'rfid']
+class FakeWDT(NS):
+    def __init__(self, id=0, timeout=0):
+        from config import local
+        self._wdtCheckThreadAlive = False
+        self.id = id
+        self.timeout = timeout or local.wdtTimeout or 8_200
+        self.feed()
+        thread(self.threadProc)
+    def feed(self):
+        self.last_feed = ticks_ms()
+    def threadProc(self):
+        print('\n[DEBUG]  FakeWDT thread started')
+        self._wdtCheckThreadAlive = True
+        try:
+            while not shared.aborted and self._wdtCheckThreadAlive:
+                sleep_ms(50)
+                self.check()
+                if shared.aborted:
+                    break
+        except KeyboardInterrupt as ex:
+            shared.aborted = True
+            print("\n[FakeWDT thread] ==> (KeyboardInterrupt)")
+        finally:
+            self._wdtCheckThreadAlive = False
+        print('\n[DEBUG]  FakeWDT thread stopped')
+    def check(self):
+        timeout = self.timeout
+        diff = ticks_diff(ticks_ms(), self.last_feed)
+        if diff > timeout:
+            import os
+            import app
+            shared.aborted = app.aborted = app.threadAborted = True
+            sleep_ms(50)
+            print('\n\n')
+            print('************************************************************')
+            print('\n')
+            print('         Fake Watchdog thread interrupted execution         ')
+            print('\n')
+            print('************************************************************')
+            print('\n')
+            sleep_ms(50)
+            os._exit(99)
 
 # User Functions
 def getUpdateUrls():
@@ -389,6 +432,28 @@ def statusShouldBeChecked():
     return intv and ticks_diff(ticks_ms(), lastMS) > intv
 def uptime():
     return ticks_diff(ticks_ms(), shared.startTime or 0)
+def freeMemory():
+    if isLocalPy():
+        import tracemalloc
+        current, peak = tracemalloc.get_traced_memory()
+        return peak - current   # tamamen sezgisel
+    else:
+        return gc.mem_free()
+def initWDT(timeout=None):
+    from config import local
+    timeout = timeout or local.wdtTimeout
+    if isLocalPy():
+        wdt = shared.wdt = FakeWDT(timeout=timeout)
+    else:
+        try:
+            from machine import WDT
+            shared.wdt = WDT(timeout=timeout)
+        except:
+            shared.wdt = None
+def feed():
+    wdt = shared.wdt
+    if wdt is not None:
+        wdt.feed()
 
 try:
     from machine import Pin 

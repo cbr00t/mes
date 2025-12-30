@@ -7,7 +7,7 @@ from app_menus import *
 
 async def init():
     global aborted, threadAborted, localIP, srvIP, srvPort, dev, wifi, ws
-    global h, lcd, led, keypad, rfid, buzzer, plc
+    global h, lcd, led, keypad, rfid, buzzer, plc, wdt
     localIP = ip2Str(local.ip); srvIP = ip2Str(srv.ip); srvPort = srv.rawPort
     print(f'localIP: [{localIP}] | server rawwset: [{srvIP}:{srvPort}]')
     aborted = threadAborted = False
@@ -24,6 +24,7 @@ async def run():
     from config import app
     global aborted, threadAborted, loopCount
     loopCount = 0
+    initWDT()
     lcd.off().on(); lcd.clearIfReady()
     
     led.write('SIYAH')
@@ -31,7 +32,8 @@ async def run():
         led.clear()
         buzzer.beep(4000, .08)
         led.write('MOR')
-        sleep(.01);
+        sleep(.01)
+        feed()
     buzzer.beep(4000, .3)
     # sleep(.02); led.clear()
     print('app started')
@@ -40,32 +42,37 @@ async def run():
         ws.close()
     
     await asleep(.1)
+    feed()
+    
     lcd.writeIfReady(f'{app.name} v{version2Str(app.version)}', 0, 0)
     gc.collect()
+    feed()
     
     thread(threadProc)
     led.write('CYAN')
     
-    while not aborted:
+    feed()
+    while not (shared.aborted or aborted):
         try:
             loopCount += 1
             if not await loop():
                 break
+            feed()
         except KeyboardInterrupt as ex:
-            aborted = True
             print("\n[core0] stopped by user (KeyboardInterrupt)")
             sleep(.5)
+            break
         except Exception as ex:
             print('[ERROR]', 'APP LOOP:', ex)
             print_exception(ex)
-    aborted = threadAborted = True
+            feed()
+    aborted = threadAborted = shared.aborted = True
     try:
         await ws.close()
     except:
         pass
     gc.collect()
     led.write('TURUNCU')
-    await asleep(2)
     lcd.clear(); lcd.write('SHUTDOWN', 1,1)
 
 def threadProc():
@@ -85,7 +92,7 @@ def threadProc():
     _now = ticks_ms(); lastTS_keypad = _now
     lastTS_rfid = _now; lastTS_plc = _now
     gc.collect()
-    while not (aborted or threadAborted):
+    while not (aborted or threadAborted or shared.aborted):
         katsayi = 5 if isIdle() else 1
         sleep_ms(global_wait * katsayi)
         try:
@@ -106,7 +113,7 @@ def threadProc():
                 try: plc.update()
                 finally: lastTS_plc = ticks_ms()
         except KeyboardInterrupt as ex:
-            aborted = threadAborted = True
+            aborted = threadAborted = shared.aborted = True
             print("\n[core1] stopped by user (KeyboardInterrupt)")
             return
         except Exception as ex:
@@ -134,12 +141,12 @@ async def loop():
     if not lcdIsBusy():
         await processQueues()
     await asleep_ms(waitMS)
-    if not checkGC():
+    feed()
+    if not await checkGC():
         return False    # break loop
-    if checkReboot():
+    if await checkReboot():
         return False    # break loop
-    return True
-
+    return True    
 def initDevice():
     print('    init device')
     dev = shared.dev
@@ -163,37 +170,46 @@ async def updateSelf():
     lcd.write('GUNCELLENIYOR...   ', 3, 2)
     await asleep_ms(50); srv.autoUpdate = True
     await updateFiles()
-    reboot()
-def reboot():
-    global aborted, threadAborted, wifi, ws
-    aborted = threadAborted = True            # core1 thread de dursun
-    if isMicroPy():
-        import machine
+    await reboot()
+async def reboot():
+    await preReboot()
+    _reboot()
+async def preReboot():
     gc.collect()
-    print('finalize...')
-    lcd.write('CLEANUP...      ', 3, 2)
+    print('rebooting...')
+    if lcd is not None:
+        try: lcd.write('REBOOTING...    ', 3, 2)
+        except: pass
+    print('  finalize...')
     try:
-        if ws.isConnected():
-            ws.close()
+        if ws is not None and ws.isConnected():
+            await ws.close()
     except:
         pass
     try:
-        if wifi.isConnected():
+        if wifi is not None and wifi.isConnected():
             wifi.disconnect()
     except:
         pass
-    print('rebooting...')
-    try:
-        lcd.write('REBOOTING...    ', 3, 2)
-    except:
-        pass
-    sleep_ms(50)
-    gc.collect()
+def _reboot():
+    global aborted, threadAborted
+    print('  core1 stop state...')
+    aborted = threadAborted = shared.aborted = True            # core1 thread de dursun
     if isMicroPy():
-        machine.reset()
+        import machine
+    gc.collect()
+    sleep_ms(100)                                              # core1 thread sonlanması için biraz zaman ver
+    print('  reset...')
+    wdt = None
+    if isMicroPy():
+        print('  WDT reconfigure...')
+        initWDT(1_000)
+        sleep(50)
+        try: machine.reset()
+        except: pass
     while True:
         # CPU HALT state loop
-        sleep_ms(10)
+        sleep_ms(50)
 
 async def wifiWait():
     while not wifiCheck():
@@ -535,26 +551,26 @@ async def onKeyReleased_defaultAction(rec):
     key = key.lower();
     if key == 'esc' and duration >= 2:
         # from app import reboot
-        reboot()
+        await reboot()
     return True
 
-def checkGC():
+async def checkGC():
     gcLoopCount = local.gcLoopCount
     freeBytesLimit = local.gcFreeBytesLimit
-    freeBytes = gc.mem_free()
+    freeBytes = freeMemory()
     shouldGC = gcLoopCount and loopCount % (gcLoopCount + 1) == gcLoopCount
     if not shouldGC and freeBytesLimit and freeBytes < freeBytesLimit:
         shouldGC = True
     if shouldGC:
         print(f'[DEBUG]  gc.collect(): free memory - freeBytes: [{freeBytes}] | gcFreeBytesLimit: [{freeBytesLimit}]')
         gc.collect()
-    freeBytes = gc.mem_free()
+    freeBytes = freeMemory()
     if freeBytesLimit and freeBytes < freeBytesLimit:
         print(f'[DEBUG]  gc.collect(): LOW MEMORY - reboot requested  freeBytes: [{freeBytes}] | gcFreeBytesLimit: [{freeBytesLimit}]')
-        reboot()
+        await reboot()
         return False    # break loop
     return True
-def checkReboot():
+async def checkReboot():
     global loopCount
     rebootTimeMS = local.rebootTime or 0
     rebootTimeMS *= 60_000
@@ -562,13 +578,13 @@ def checkReboot():
     _busy = isBusy()
     _debugPrintIterCount = 10
     if _debugPrintIterCount and loopCount % (_debugPrintIterCount + 1) == _debugPrintIterCount:
-        print(f'[DEBUG]  up time: [{_uptime}] | busy: [{_busy}] | rebootTimeMins: [{local.rebootTime}]')
+        print(f'[DEBUG]  up time: [{round(_uptime / 60_000, 1)} dk] | busy: [{_busy}] | rebootTimeMins: [{local.rebootTime}]')
         print('\n')
     if rebootTimeMS <= 0 or _uptime < rebootTimeMS:
         return False
     if local.rebootWaitIdle == True and _busy:
         return False
-    reboot()
+    await reboot()
     return True
 
 try: from app_ek import *

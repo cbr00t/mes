@@ -54,7 +54,7 @@ async def updateFiles():
                     lcd.write('UPDATING:      ', 1, 1)
                     lcd.writeLine(name, 2, 3)
                 # Uzak Dosyayı indir
-                fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=3)
+                fileContent = await ws.wsTalk('webRequest', None, { 'url': fileUrl, 'output': 'str', 'stream': False }, timeout=1.5)
                 fileContent = fileContent.get('data', dict()).get('string') if isinstance(fileContent, dict) else None
                 gc.collect()
                 if fileContent:

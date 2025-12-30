@@ -11,6 +11,7 @@ class BaseLED:
         )
         pass
     def write(self, color):
+        feed()
         if color is None:
             color = ''
         if isinstance(color, str):
@@ -55,6 +56,7 @@ class BaseLED:
         self.write('SIYAH')
         return self
     def brightness(self, value):
+        feed()
         result = self._brightness(value)
         l = self.state.last
         if value is not None:

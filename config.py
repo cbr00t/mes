@@ -6,7 +6,7 @@ from common import *
 
 app = NS(
     name                            = 'Sky MES',
-    version                         = (1, 1, 25)
+    version                         = (1, 1, 27)
 )
 
 
@@ -26,7 +26,8 @@ local = NS(
     rebootTime                      =  0,                                 # dk
     rebootWaitIdle                  =  True,
     gcLoopCount                     =  100,
-    gcFreeBytesLimit                =  8_000
+    gcFreeBytesLimit                =  8_000,
+    wdtTimeout                      =  None                               # ms
 )
 
 ## Ana Makine (Server) Ayarları
@@ -39,7 +40,7 @@ server = NS(
     autoUpdate                      =  True,                               # True = Force Auto-Update | False = No Auto-Update | None = Use Device Defaults
     updateUrl_postfix               =  '/mes/update',
     statusCheckInterval             =  3.0,                                # sn
-    socketTimeout                   =  1.0                                 # sn
+    socketTimeout                   =  0.7                                 # sn
 )
 
 wifi = NS(

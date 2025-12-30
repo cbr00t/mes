@@ -23,6 +23,7 @@ class BaseWebSocket:
         return self.ws is not None
     async def open(self):
         """Public open; çağıran kod bunu kullanır."""
+        feed()
         url = self.url
         lcd = shared.dev.lcd
         try:
@@ -48,6 +49,7 @@ class BaseWebSocket:
         """Platform-özel bağlantı: alt sınıfta (MicroPython/CPython) override edilir."""
         raise NotImplementedError()
     async def close(self):
+        feed()
         lcd = shared.dev.lcd
         ws = self.ws
         if ws:
@@ -67,6 +69,7 @@ class BaseWebSocket:
         return True
     # ---- ws helpers --------------------------------------------------------
     async def send(self, text: str):
+        feed()
         ws = self.ws
         if not ws:
             raise RuntimeError('WebSocket not connected')
@@ -101,6 +104,7 @@ class BaseWebSocket:
             await self.close()
             return False
     async def recv(self, timeout=None):
+        feed()
         ws = self.ws
         if not ws:
             return None
@@ -162,7 +166,7 @@ class BaseWebSocket:
                             # gerekirse cihaz reboot
                             try:
                                from app import reboot
-                               reboot()
+                               await reboot()
                             except:
                                pass
                     else:
